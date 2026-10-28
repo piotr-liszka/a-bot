@@ -16,7 +16,8 @@
     "db:start": "supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,storage-api,mailpit,postgres-meta",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "box:pack": "node scripts/pack-box.mjs"
+    "box:pack": "node scripts/pack-box.mjs",
+    "postinstall": "node scripts/ensure-electron.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
