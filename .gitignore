@@ -1,0 +1,11 @@
+node_modules/
+dist/
+out/
+release/
+*.log
+.env
+.env.local
+firebase/*-debug.log
+.a-bot/
+workspace/
+.proxy-ca.crt

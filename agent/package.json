@@ -1,0 +1,26 @@
+{
+  "name": "@a-bot/agent",
+  "version": "0.1.0",
+  "description": "a-bot device agent: runs inside the shared Linux container, detects AI CLIs and executes chat jobs from Firestore.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "a-bot-agent": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts run",
+    "start": "node dist/index.js run",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0"
+  },
+  "devDependencies": {
+    "@a-bot/shared": "*",
+    "@types/node": "^22.18.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.0"
+  }
+}

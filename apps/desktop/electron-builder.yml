@@ -1,0 +1,18 @@
+appId: dev.a-bot.desktop
+productName: a-bot
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/main/**
+  - out/preload/**
+  - out/renderer/**
+  - package.json
+mac:
+  category: public.app-category.developer-tools
+  target: [dmg]
+win:
+  target: [nsis]
+linux:
+  target: [AppImage, deb]
+  category: Development

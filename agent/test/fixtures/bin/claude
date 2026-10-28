@@ -1,0 +1,38 @@
+#!/usr/bin/env node
+// Stand-in for the Claude Code CLI used in tests and demos: replays a short stream-json session.
+const args = process.argv.slice(2);
+const out = (o) => process.stdout.write(JSON.stringify(o) + '\n');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+if (args[0] === '--version') {
+  console.log('2.1.0 (Claude Code)');
+  process.exit(0);
+}
+if (args[0] === 'auth' && args[1] === 'status') {
+  console.log(JSON.stringify({ loggedIn: true, authMethod: 'claude.ai' }));
+  process.exit(0);
+}
+const prompt = args[args.indexOf('-p') + 1] ?? '';
+const words = (text) => text.split(/(?<= )/);
+
+(async () => {
+  out({ type: 'system', subtype: 'init', session_id: 'fake-session-1', model: 'sonnet' });
+  out({ type: 'stream_event', event: { type: 'message_start' } });
+  for (const w of words('Sprawdzę, co jest w katalogu roboczym. ')) {
+    out({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: w } } });
+    await sleep(40);
+  }
+  out({ type: 'assistant', message: { id: 'm1', content: [{ type: 'tool_use', id: 'tu1', name: 'Bash', input: { command: 'ls -la /workspace', description: 'Lista plików w workspace' } }] } });
+  await sleep(700);
+  out({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'tu1', content: 'total 12\ndrwxr-xr-x 3 root root 4096 .\n-rw-r--r-- 1 root root  220 notatki.md\ndrwxr-xr-x 2 root root 4096 projekt' }] } });
+  out({ type: 'assistant', message: { id: 'm2', content: [{ type: 'tool_use', id: 'tu2', name: 'Read', input: { file_path: '/workspace/notatki.md' } }] } });
+  await sleep(500);
+  out({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'tu2', content: '# Notatki\n- dokończyć POC' }] } });
+  out({ type: 'stream_event', event: { type: 'message_start' } });
+  const answer = `W \`/workspace\` są dwie rzeczy:\n\n| Nazwa | Typ |\n|---|---|\n| \`notatki.md\` | plik, 220 B |\n| \`projekt/\` | katalog |\n\nW notatkach jest jedno zadanie: **dokończyć POC**. (Pytanie: „${prompt.slice(0, 60)}”.)`;
+  for (const w of words(answer)) {
+    out({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: w } } });
+    await sleep(25);
+  }
+  out({ type: 'result', subtype: 'success', is_error: false, result: answer, session_id: 'fake-session-1', total_cost_usd: 0.0123, usage: { input_tokens: 1200, output_tokens: 86 } });
+})();
