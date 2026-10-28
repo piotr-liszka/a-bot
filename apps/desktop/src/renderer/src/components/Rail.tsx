@@ -1,8 +1,9 @@
 import type { BotRow, DeviceRow } from '@a-bot/shared';
 import { isDeviceOnline } from '@a-bot/shared';
-import { ChevronsUpDown, MessageSquare, Monitor, Plus, Settings } from 'lucide-react';
+import { ChevronsUpDown, Loader2, MessageSquare, Monitor, Plus, Settings } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { engineOf, engineState, relativeSeen } from '../lib/format';
+import type { WorkerUpdate } from '../lib/workers';
 import { BotAvatar } from './BotAvatar';
 import { Brand } from './GateSide';
 
@@ -13,6 +14,8 @@ interface Props {
   devices: DeviceRow[];
   device?: DeviceRow;
   online: boolean;
+  /** Background sandbox update on the selected device. */
+  update?: WorkerUpdate;
   now: number;
   bots: BotRow[];
   botId?: string;
@@ -52,10 +55,18 @@ export function Rail(p: Props) {
         {p.device && (
           <div className="device-switch" ref={menuRef}>
             <button className="device-btn" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)} title={p.device.name}>
-              <span className={`dot ${p.online ? 'on' : 'off'}`} aria-hidden />
+              {p.update?.state === 'updating' ? <Loader2 size={10} className="spin" aria-hidden /> : <span className={`dot ${p.online ? 'on' : 'off'}`} aria-hidden />}
               <span className="meta">
                 <span className="name">{p.device.name}</span>
-                <span className="sub">{p.online ? 'Online' : `Offline, widziany ${relativeSeen(p.device.last_seen, p.now)}`}</span>
+                <span className="sub" title={p.update?.state === 'error' ? p.update.message : undefined}>
+                  {p.update?.state === 'updating'
+                    ? 'Aktualizuję sandbox…'
+                    : p.update?.state === 'error'
+                      ? 'Aktualizacja nie powiodła się'
+                      : p.online
+                        ? 'Online'
+                        : `Offline, widziany ${relativeSeen(p.device.last_seen, p.now)}`}
+                </span>
               </span>
               <ChevronsUpDown size={14} aria-hidden />
             </button>

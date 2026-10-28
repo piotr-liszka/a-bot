@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useBots, useConversations, useDevices, useNow } from '../lib/data';
 import { bridge } from '../lib/desktopApi';
 import { engineOf } from '../lib/format';
-import { useWorkers } from '../lib/workers';
+import { useAutoUpdate, useWorkers } from '../lib/workers';
 import { BotEditor } from './BotEditor';
 import { Chat } from './Chat';
 import { ConversationList } from './ConversationList';
@@ -71,6 +71,8 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
 
   const botConversations = useMemo(() => conversations.rows.filter((c) => c.bot_id && c.bot_id === bot?.id), [conversations.rows, bot?.id]);
   const busyBots = useMemo(() => new Set(conversations.rows.filter((c) => c.busy && c.bot_id).map((c) => c.bot_id!)), [conversations.rows]);
+  const busyDevices = useMemo(() => new Set(conversations.loading ? devices.rows.map((d) => d.id) : conversations.rows.filter((c) => c.busy).map((c) => c.device_id)), [conversations, devices.rows]);
+  const updates = useAutoUpdate(workers.workers, busyDevices);
   const conversation: ConversationRow | undefined = botConversations.find((c) => c.id === conversationId);
 
   const online = device ? isDeviceOnline(device, now) : false;
@@ -178,6 +180,7 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
         devices={devices.rows}
         device={device}
         online={online}
+        update={device ? updates.get(device.id) : undefined}
         now={now}
         bots={deviceBots}
         botId={bot?.id}

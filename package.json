@@ -10,14 +10,14 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w @a-bot/desktop",
+    "dev": "node scripts/ensure-deps.mjs && npm run dev -w @a-bot/desktop",
     "build": "npm run box:pack && npm run build -w @a-bot/desktop",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:start": "supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,storage-api,mailpit,postgres-meta",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "box:pack": "node scripts/pack-box.mjs",
-    "postinstall": "node scripts/ensure-electron.mjs"
+    "postinstall": "node scripts/ensure-electron.mjs && node scripts/ensure-deps.mjs --stamp"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

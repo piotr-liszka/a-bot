@@ -157,11 +157,21 @@ function sftp(c: Client): Promise<SFTPWrapper> {
 async function uploadDir(s: SFTPWrapper, local: string, remote: string) {
   await new Promise<void>((resolve) => s.mkdir(remote, () => resolve()));
   for (const entry of readdirSync(local)) {
-    if (entry === '.env' || entry.startsWith('Dockerfile.') || entry === 'proxy-ca.crt') continue;
+    // VERSION is written only after a successful start, so a failed update is retried.
+    if (entry === '.env' || entry === 'VERSION' || entry.startsWith('Dockerfile.') || entry === 'proxy-ca.crt') continue;
     const lp = join(local, entry);
     const rp = posix.join(remote, entry);
     if (statSync(lp).isDirectory()) await uploadDir(s, lp, rp);
     else await new Promise<void>((resolve, reject) => s.fastPut(lp, rp, (err) => (err ? reject(err) : resolve())));
+  }
+}
+
+/** Version of the box bundled with this app (dist/box/VERSION, written by box:pack). */
+function boxVersion(): string | undefined {
+  try {
+    return readFileSync(join(boxDir(), 'VERSION'), 'utf8').trim();
+  } catch {
+    return undefined;
   }
 }
 
@@ -254,6 +264,23 @@ export class WorkerManager {
     return c;
   }
 
+  /**
+   * Whether the worker runs an older sandbox than the one bundled with this app.
+   * Unreachable workers count as current; the check runs again on the next start.
+   */
+  async outdated(id: string): Promise<boolean> {
+    const bundled = boxVersion();
+    if (!bundled) return false;
+    try {
+      const c = await this.client(id);
+      const installed = await run(c, `cat "$HOME"/${REMOTE_DIR}/VERSION 2>/dev/null; docker inspect -f '{{.State.Running}}' a-bot 2>/dev/null`);
+      const [version, running] = installed.out.trim().split('\n');
+      return version !== bundled || running !== 'true';
+    } catch {
+      return false;
+    }
+  }
+
   /** Connects with unsaved settings and reports whether Docker is usable there. */
   async test(input: WorkerInput): Promise<{ docker: string }> {
     const c = await connect(connectConfig(input, input.secret));
@@ -311,6 +338,8 @@ export class WorkerManager {
       await run(c, `docker ps -a --format '{{.Names}} {{.Label "com.docker.compose.project.working_dir"}}' | awk '$1=="a-bot" && $2!=${shellQuote(remoteDir)} {print $1}' | xargs -r docker rm -f`);
       const up = await run(c, `cd ${shellQuote(remoteDir)} && docker compose -p a-bot up -d --remove-orphans 2>&1`, (line) => emit({ step: 'start', status: 'running', log: line }));
       if (up.code !== 0) throw new Error(`Uruchomienie nie powiodło się:\n${up.out.split('\n').slice(-8).join('\n')}`);
+      const bundled = boxVersion();
+      if (bundled) await run(c, `printf '%s\\n' ${shellQuote(bundled)} > ${shellQuote(posix.join(remoteDir, 'VERSION'))}`);
       emit({ step, status: 'done' });
 
       step = 'pair';

@@ -39,6 +39,7 @@ interface DesktopBridge {
     remove(id: string): Promise<void>;
     link(id: string, deviceId: string): Promise<void>;
     test(input: WorkerInput): Promise<{ docker: string }>;
+    outdated(id: string): Promise<boolean>;
     install(id: string, opts: { backendUrl: string; anonKey: string }): Promise<{ pairingCode?: string; deviceId?: string }>;
     desktop(id: string): Promise<{ url: string; password: string }>;
     exec(id: string, command: 'browser' | 'restart' | 'claude-logout' | 'codex-logout'): Promise<string>;

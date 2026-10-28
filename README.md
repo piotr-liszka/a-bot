@@ -41,6 +41,9 @@ device you choose, using **your own subscriptions**.
    drive). **Ustawienia → Terminal** is a root shell inside the sandbox; it runs in tmux, so the session survives
    closing the view or the app.
 
+The app keeps workers up to date by itself: on start it compares each worker's sandbox with the one bundled in the
+app and reinstalls it in the background when they differ (history, logins and the device identity stay).
+
 Supabase remembers sessions and history and shows which workers are live. SSH credentials stay on your computer
 (encrypted with the OS keychain); the desktop and terminal travel through the SSH connection, nothing is exposed.
 
@@ -108,3 +111,9 @@ Messages are stored in plain text in your Supabase project.
 ## License
 
 MIT
+
+## Database migrations
+
+`.github/workflows/supabase-migrations.yml` runs `supabase db push` on every push to `main` that touches
+`supabase/migrations`. Set the repository secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` once (and
+optionally the variable `SUPABASE_PROJECT_REF`); without them the job skips.

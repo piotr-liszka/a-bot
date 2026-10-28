@@ -9,6 +9,7 @@ function registerIpc() {
   ipcMain.handle('workers:save', (_e, input: WorkerInput & { id?: string }) => workers.save(input));
   ipcMain.handle('workers:remove', (_e, id: string) => workers.remove(id));
   ipcMain.handle('workers:link', (_e, id: string, deviceId: string) => workers.link(id, deviceId));
+  ipcMain.handle('workers:outdated', (_e, id: string) => workers.outdated(id));
   ipcMain.handle('workers:test', (_e, input: WorkerInput) => workers.test(input));
   ipcMain.handle('workers:install', (e, id: string, opts: InstallOptions) => workers.install(id, opts, e.sender));
   ipcMain.handle('workers:desktop', (_e, id: string) => workers.desktop(id));

@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('abot', {
     remove: (id: string) => ipcRenderer.invoke('workers:remove', id),
     link: (id: string, deviceId: string) => ipcRenderer.invoke('workers:link', id, deviceId),
     test: (input: unknown) => ipcRenderer.invoke('workers:test', input),
+    outdated: (id: string) => ipcRenderer.invoke('workers:outdated', id),
     install: (id: string, opts: unknown) => ipcRenderer.invoke('workers:install', id, opts),
     desktop: (id: string) => ipcRenderer.invoke('workers:desktop', id),
     exec: (id: string, command: string) => ipcRenderer.invoke('workers:exec', id, command),
