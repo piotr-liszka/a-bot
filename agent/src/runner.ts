@@ -1,4 +1,4 @@
-import { upsertStep, type ConversationRow, type MessageRow, type MessageStep, type MessageUsage } from '@a-bot/shared';
+import { upsertStep, type BotRow, type ConversationRow, type MessageRow, type MessageStep, type MessageUsage } from '@a-bot/shared';
 import type { Db } from './backend.js';
 import { log } from './log.js';
 import { ProviderError, type ChatTurn, type Provider } from './providers/index.js';
@@ -125,18 +125,24 @@ export class JobRunner {
     };
     const timer = setInterval(flush, FLUSH_MS);
 
+    let bot: BotRow | null = null;
+    if (conv.bot_id) {
+      const { data } = await this.db.from('bots').select('*').eq('id', conv.bot_id).maybeSingle<BotRow>();
+      bot = data;
+    }
     const provider = this.providers().get(conv.provider_id);
-    const model = message.model ?? conv.model ?? undefined;
+    const model = message.model ?? conv.model ?? bot?.model ?? undefined;
     log.info(`→ ${conv.provider_id}${model ? `/${model}` : ''} w „${conv.title}”`);
     let status: MessageRow['status'] = 'done';
     let errorText: string | null = null;
     try {
-      if (!provider) throw new ProviderError(`Bot „${conv.provider_id}” nie jest dostępny na tym urządzeniu.`);
+      if (!provider) throw new ProviderError(`Silnik „${conv.provider_id}” nie jest dostępny na tym urządzeniu.`);
       if (!lastUser) throw new ProviderError('Brak wiadomości, na którą można odpowiedzieć.');
       await provider.run({
         prompt: lastUser.text,
         history,
         model,
+        instructions: bot?.instructions ?? undefined,
         sessionId,
         cwd: this.workspace,
         signal: ctl.signal,

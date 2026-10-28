@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       jq ripgrep unzip zip xz-utils build-essential python3 python3-pip python3-venv \
       chromium fonts-liberation fonts-dejavu-core fonts-noto-color-emoji \
       tigervnc-standalone-server tigervnc-tools websockify openbox xterm x11-xserver-utils \
-      supervisor tini \
+      supervisor tini tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # Bots. Log in once from the app's Terminal tab (claude auth login / codex login);
@@ -35,6 +35,7 @@ COPY browser.sh /usr/local/bin/browser
 COPY supervisord.conf /etc/supervisor/conf.d/a-bot.conf
 COPY openbox-menu.xml /etc/xdg/openbox/menu.xml
 COPY openbox-autostart.sh /etc/xdg/openbox/autostart
+COPY tmux.conf /etc/tmux.conf
 RUN chmod +x /usr/local/bin/a-bot-entrypoint /usr/local/bin/browser
 
 WORKDIR /workspace

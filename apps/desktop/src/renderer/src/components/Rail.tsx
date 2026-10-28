@@ -1,29 +1,31 @@
-import type { DeviceRow, ProviderInfo } from '@a-bot/shared';
+import type { BotRow, DeviceRow } from '@a-bot/shared';
 import { isDeviceOnline } from '@a-bot/shared';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { ChevronsUpDown, LogOut, MessageSquare, Monitor, Plus, Server, SquareTerminal } from 'lucide-react';
+import { ChevronsUpDown, MessageSquare, Monitor, Plus, Settings } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { botState, relativeSeen } from '../lib/format';
+import { engineOf, engineState, relativeSeen } from '../lib/format';
 import { BotAvatar } from './BotAvatar';
 import { Brand } from './GateSide';
 
-export type View = 'chat' | 'desktop' | 'terminal' | 'devices';
+export type View = 'chat' | 'desktop' | 'bot' | 'settings';
 
 interface Props {
-  db: SupabaseClient;
   email: string;
   devices: DeviceRow[];
   device?: DeviceRow;
   online: boolean;
   now: number;
-  bot?: ProviderInfo;
+  bots: BotRow[];
+  botId?: string;
+  /** Bot ids with a conversation in progress. */
   busyBots: Set<string>;
   view: View;
   canUseWorker: boolean;
-  onSelectView: (view: View) => void;
+  onSelectView: (view: 'chat' | 'desktop') => void;
   onSelectDevice: (id: string) => void;
   onSelectBot: (id: string) => void;
-  onShowDevices: () => void;
+  onNewBot: () => void;
+  onAddDevice: () => void;
+  onOpenSettings: () => void;
 }
 
 export function Rail(p: Props) {
@@ -77,7 +79,7 @@ export function Rail(p: Props) {
                 <button
                   role="menuitem"
                   onClick={() => {
-                    p.onShowDevices();
+                    p.onAddDevice();
                     setMenuOpen(false);
                   }}
                 >
@@ -93,7 +95,6 @@ export function Rail(p: Props) {
               [
                 ['chat', 'Czat', MessageSquare],
                 ['desktop', 'Pulpit', Monitor],
-                ['terminal', 'Terminal', SquareTerminal],
               ] as const
             ).map(([v, label, Icon]) => (
               <button key={v} aria-pressed={p.view === v} onClick={() => p.onSelectView(v)} title={label}>
@@ -107,41 +108,55 @@ export function Rail(p: Props) {
 
       {p.device && (
         <>
-          <div className="rail-section">Boty</div>
+          <div className="rail-section">
+            <span>Boty</span>
+            <button className="rail-add" onClick={p.onNewBot} title="Nowy bot" aria-label="Nowy bot">
+              <Plus size={14} />
+            </button>
+          </div>
           <ul className="bot-list">
-            {p.device.providers.map((b) => {
-              const state = botState(b);
+            {p.bots.map((b) => {
+              const engine = engineOf(b, p.device);
+              const state = engineState(engine);
               const working = p.busyBots.has(b.id);
               return (
                 <li key={b.id}>
                   <button
                     className={`bot-item${state.tone === 'on' ? '' : ' unavailable'}`}
-                    aria-current={p.view === 'chat' && p.bot?.id === b.id}
+                    aria-current={p.view === 'chat' && p.botId === b.id}
                     onClick={() => p.onSelectBot(b.id)}
                     title={`${b.name}: ${working ? 'pracuje' : state.label}`}
                   >
-                    <BotAvatar bot={b} />
+                    <BotAvatar bot={{ name: b.name, kind: engine?.kind, color: b.color }} />
                     <span className="meta">
                       <span className="name">{b.name}</span>
-                      <span className="sub">{working ? 'Pracuje…' : state.tone === 'on' ? (b.version ? `v${b.version}` : state.label) : state.label}</span>
+                      <span className="sub">{working ? 'Pracuje…' : state.tone === 'on' ? [engine?.name, b.model].filter(Boolean).join(' · ') : state.label}</span>
                     </span>
                     {working ? <span className="working" aria-label="pracuje" /> : state.tone === 'warn' ? <span className="dot warn" aria-hidden /> : null}
                   </button>
                 </li>
               );
             })}
+            {p.bots.length === 0 && (
+              <li>
+                <button className="bot-item bot-new" onClick={p.onNewBot}>
+                  <span className="avatar ghost" aria-hidden>
+                    <Plus size={15} />
+                  </span>
+                  <span className="meta">
+                    <span className="name">Stwórz bota</span>
+                  </span>
+                </button>
+              </li>
+            )}
           </ul>
         </>
       )}
 
       <div className="rail-bottom">
-        <button className="rail-link" aria-current={p.view === 'devices'} onClick={p.onShowDevices}>
-          <Server size={16} aria-hidden />
-          <span className="grow">Urządzenia</span>
-        </button>
-        <button className="rail-link" onClick={() => p.db.auth.signOut()} title={`Wyloguj ${p.email}`}>
-          <LogOut size={16} aria-hidden />
-          <span className="grow">{p.email}</span>
+        <button className="rail-link" aria-current={p.view === 'settings'} onClick={p.onOpenSettings} title={p.email}>
+          <Settings size={16} aria-hidden />
+          <span className="grow">Ustawienia</span>
         </button>
       </div>
     </nav>

@@ -1,6 +1,7 @@
 // Bridge to the Electron main process (SSH workers, desktop tunnel, terminals). Absent in the web build.
 
 export type AuthMethod = 'agent' | 'key' | 'password';
+export type TerminalKind = 'shell' | 'claude-login' | 'codex-login';
 
 export interface WorkerInput {
   name: string;
@@ -40,11 +41,11 @@ interface DesktopBridge {
     test(input: WorkerInput): Promise<{ docker: string }>;
     install(id: string, opts: { backendUrl: string; anonKey: string }): Promise<{ pairingCode?: string; deviceId?: string }>;
     desktop(id: string): Promise<{ url: string; password: string }>;
-    exec(id: string, command: 'browser' | 'restart'): Promise<void>;
+    exec(id: string, command: 'browser' | 'restart' | 'claude-logout' | 'codex-logout'): Promise<string>;
     onProgress(listener: (e: InstallEvent) => void): () => void;
   };
   terminal: {
-    open(id: string, cols: number, rows: number): Promise<string>;
+    open(id: string, kind: TerminalKind, cols: number, rows: number): Promise<string>;
     write(termId: string, data: string): void;
     resize(termId: string, cols: number, rows: number): void;
     close(termId: string): void;

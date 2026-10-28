@@ -31,5 +31,5 @@ function Connected({ backend, onChangeBackend }: { backend: BackendConfig; onCha
   const session = useSession(db);
   if (session === undefined) return null;
   if (!session) return <AuthScreen db={db} backend={backend} onChangeBackend={onChangeBackend} />;
-  return <Workspace db={db} session={session} />;
+  return <Workspace db={db} session={session} onChangeBackend={onChangeBackend} />;
 }

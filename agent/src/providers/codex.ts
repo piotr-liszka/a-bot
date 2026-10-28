@@ -99,13 +99,15 @@ export const codexProvider: Provider = {
     info.version = v.stdout.trim().replace(/^codex-cli\s*/, '') || undefined;
     const s = await exec('codex', ['login', 'status']);
     info.authenticated = s.code === 0;
-    if (!info.authenticated) info.setupHint = 'Zaloguj w zakładce Terminal: codex login --device-auth';
+    if (!info.authenticated) info.setupHint = 'Zaloguj w Ustawienia → Konta modeli albo w kontenerze: codex login --device-auth';
     return info;
   },
   async run(ctx) {
     const common = ['--json', '--skip-git-repo-check', '--dangerously-bypass-approvals-and-sandbox'];
     if (ctx.model) common.push('--model', ctx.model);
-    const args = ctx.sessionId ? ['exec', 'resume', ...common, ctx.sessionId, ctx.prompt] : ['exec', ...common, ctx.prompt];
+    // Codex has no per-run system prompt flag; the bot's instructions open the session instead.
+    const prompt = !ctx.sessionId && ctx.instructions ? `${ctx.instructions}\n\n---\n\n${ctx.prompt}` : ctx.prompt;
+    const args = ctx.sessionId ? ['exec', 'resume', ...common, ctx.sessionId, prompt] : ['exec', ...common, prompt];
     const parser = createCodexParser(ctx.emit);
     const res = await streamLines('codex', args, { cwd: ctx.cwd, signal: ctx.signal, onLine: parser.handle });
     if (ctx.signal.aborted) return;

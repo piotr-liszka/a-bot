@@ -20,6 +20,8 @@ export interface RunContext {
   /** Earlier turns of the conversation, oldest first, without the current prompt. */
   history: ChatTurn[];
   model?: string;
+  /** Standing instructions from the bot definition. */
+  instructions?: string;
   sessionId?: string;
   cwd: string;
   signal: AbortSignal;

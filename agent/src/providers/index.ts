@@ -3,7 +3,6 @@ import { claudeProvider } from './claude.js';
 import { codexProvider } from './codex.js';
 import { customProvider, type CustomProviderConfig } from './custom.js';
 import { ollamaProvider } from './ollama.js';
-import { shellProvider } from './shell.js';
 import type { Provider } from './types.js';
 
 export type { Provider, RunContext, RunEmitter, ChatTurn } from './types.js';
@@ -11,7 +10,7 @@ export { ProviderError } from './types.js';
 export type { CustomProviderConfig } from './custom.js';
 
 export function buildProviders(custom: CustomProviderConfig[] = []): Map<string, Provider> {
-  const list = [claudeProvider, codexProvider, ollamaProvider, shellProvider, ...custom.map(customProvider)];
+  const list = [claudeProvider, codexProvider, ollamaProvider, ...custom.map(customProvider)];
   return new Map(list.map((p) => [p.id, p]));
 }
 

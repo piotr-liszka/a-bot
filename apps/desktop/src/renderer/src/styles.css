@@ -1664,3 +1664,198 @@ details.manual summary {
 details.manual[open] summary {
   margin-bottom: 14px;
 }
+
+/* ---------- Bots ---------- */
+
+.rail-add {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--rail-text-2);
+}
+.rail-add:hover {
+  background: var(--rail-hover);
+  color: var(--rail-text);
+}
+.avatar.ghost {
+  background: none;
+  border: 1px dashed var(--rail-line);
+  color: var(--rail-text-2);
+}
+.bot-new .name {
+  color: var(--rail-text-2);
+  font-weight: 500;
+}
+
+.bot-form {
+  display: grid;
+  gap: 16px;
+}
+textarea.input.textarea {
+  height: auto;
+  min-height: 120px;
+  padding: 10px 12px;
+  resize: vertical;
+  line-height: 1.5;
+}
+.swatches {
+  display: flex;
+  gap: 8px;
+}
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 0;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: outline-color 150ms var(--ease);
+}
+.swatch[aria-checked='true'] {
+  outline-color: var(--text);
+}
+.push-right {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
+}
+.link-btn {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent, var(--text));
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.intro-instructions {
+  display: block;
+  margin-top: 10px;
+  max-width: 52ch;
+  color: var(--text-3);
+  font-size: 13px;
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- Settings ---------- */
+
+.keep {
+  display: contents;
+}
+.keep[hidden] {
+  display: none;
+}
+.settings-nav {
+  display: grid;
+  gap: 2px;
+  padding: 0 8px;
+}
+.settings-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text-2);
+  text-align: left;
+  font-size: 13.5px;
+  transition: background 150ms var(--ease), color 150ms var(--ease);
+}
+.settings-link:hover {
+  background: var(--panel-hover);
+  color: var(--text);
+}
+.settings-link[aria-current='true'] {
+  background: var(--panel-hover);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.engine-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.engine-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  font-size: 13px;
+}
+.engine-row + .engine-row {
+  border-top: 1px solid var(--line);
+}
+.engine-row .meta {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.engine-row .name {
+  font-weight: 500;
+}
+.engine-row .version {
+  font-weight: 400;
+  color: var(--text-3);
+}
+.engine-row .state {
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.engine-row .actions {
+  display: flex;
+  gap: 6px;
+}
+.device-note {
+  padding: 0 16px 14px;
+  margin: 0;
+}
+.login-term {
+  border-top: 1px solid var(--line);
+  padding: 12px 16px 16px;
+  display: grid;
+  gap: 10px;
+}
+.login-term-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.login-term-head .grow {
+  flex: 1;
+}
+.terminal-stage.login-stage {
+  margin: 0;
+  height: 300px;
+  flex: none;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 24px;
+  margin: 0;
+  font-size: 14px;
+}
+.facts dt {
+  color: var(--text-3);
+}
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

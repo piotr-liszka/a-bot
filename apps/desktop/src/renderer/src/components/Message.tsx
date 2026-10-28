@@ -1,13 +1,13 @@
-import type { MessageRow, ProviderInfo } from '@a-bot/shared';
+import type { MessageRow } from '@a-bot/shared';
 import { AlertCircle, Ban } from 'lucide-react';
 import { memo } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { shortTime } from '../lib/format';
-import { BotAvatar } from './BotAvatar';
+import { BotAvatar, type AvatarInfo } from './BotAvatar';
 import { Trace } from './Trace';
 
-function MessageView({ message: m, bot, online }: { message: MessageRow; bot: ProviderInfo; online: boolean }) {
+function MessageView({ message: m, bot, online }: { message: MessageRow; bot: AvatarInfo; online: boolean }) {
   if (m.role === 'user') return <div className="msg-user">{m.text}</div>;
 
   const live = m.status === 'pending' || m.status === 'streaming';

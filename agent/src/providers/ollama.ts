@@ -37,7 +37,7 @@ export const ollamaProvider: Provider = {
   async run(ctx) {
     const model = ctx.model;
     if (!model) throw new ProviderError('Wybierz model Ollama.');
-    const messages = [...ctx.history.map((t) => ({ role: t.role, content: t.text })), { role: 'user', content: ctx.prompt }];
+    const messages = [...(ctx.instructions ? [{ role: 'system', content: ctx.instructions }] : []), ...ctx.history.map((t) => ({ role: t.role, content: t.text })), { role: 'user', content: ctx.prompt }];
     const res = await fetch(`${ollamaHost()}/api/chat`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

@@ -48,12 +48,24 @@ async function run() {
   let providers = buildProviders(cfg.customProviders);
   const runner = new JobRunner(db, deviceId, () => providers, cfg.workspace, cfg.maxParallelJobs);
 
-  const publishProviders = async () => {
-    providers = buildProviders(cfg.customProviders);
-    const infos = await detectAll(providers);
-    const ready = infos.filter((p) => p.installed && p.authenticated).map((p) => p.name);
-    log.info(`boty gotowe: ${ready.join(', ') || 'brak'}`);
-    await db.from('devices').update({ providers: infos }).eq('id', deviceId);
+  let published = '';
+  let detecting = false;
+  /** Detects engines and publishes them when something changed (e.g. someone just logged in to claude). */
+  const publishProviders = async (force = false) => {
+    if (detecting) return;
+    detecting = true;
+    try {
+      providers = buildProviders(cfg.customProviders);
+      const infos = await detectAll(providers);
+      const snapshot = JSON.stringify(infos);
+      if (!force && snapshot === published) return;
+      const ready = infos.filter((p) => p.installed && p.authenticated).map((p) => p.name);
+      log.info(`silniki gotowe: ${ready.join(', ') || 'brak'}`);
+      const { error } = await db.from('devices').update({ providers: infos }).eq('id', deviceId);
+      if (!error) published = snapshot;
+    } finally {
+      detecting = false;
+    }
   };
 
   const heartbeat = async (status: 'online' | 'offline' = 'online') => {
@@ -72,7 +84,7 @@ async function run() {
   };
 
   await heartbeat();
-  await publishProviders();
+  await publishProviders(true);
   await runner.recoverInterrupted();
 
   const channel = db
@@ -87,8 +99,8 @@ async function run() {
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'devices', filter: `id=eq.${deviceId}` }, (payload) => {
       const next = payload.new as DeviceRow;
       if (next.refresh_requested_at && next.refresh_requested_at !== device.refresh_requested_at) {
-        log.info('odświeżanie listy botów na prośbę aplikacji');
-        publishProviders().catch((e) => log.warn(String(e)));
+        log.info('odświeżanie silników na prośbę aplikacji');
+        publishProviders(true).catch((e) => log.warn(String(e)));
       }
       device = next;
     })
@@ -108,7 +120,10 @@ async function run() {
 
   const beat = setInterval(() => heartbeat().catch(() => {}), HEARTBEAT_MS);
   // Realtime can silently drop; a slow poll makes sure nothing waits forever.
-  const poll = setInterval(() => runner.pickUpPending().catch(() => {}), 30_000);
+  const poll = setInterval(() => {
+    runner.pickUpPending().catch(() => {});
+    publishProviders().catch(() => {});
+  }, 30_000);
 
   let stopping = false;
   async function shutdown(code: number) {

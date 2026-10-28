@@ -1,10 +1,9 @@
-import type { ProviderInfo, ProviderKind } from '@a-bot/shared';
+import type { BotRow, DeviceRow, ProviderInfo, ProviderKind } from '@a-bot/shared';
 
 const hues: Record<ProviderKind, string> = {
   claude: 'oklch(0.62 0.135 42)',
   codex: 'oklch(0.42 0.02 264)',
   ollama: 'oklch(0.56 0.1 160)',
-  shell: 'oklch(0.48 0.09 235)',
   custom: 'oklch(0.52 0.13 305)',
 };
 
@@ -14,6 +13,15 @@ export function botHue(kind: ProviderKind): string {
 
 export function botMonogram(p: Pick<ProviderInfo, 'name'>): string {
   return p.name.trim().charAt(0).toUpperCase() || '?';
+}
+
+/** The engine (detected CLI) a bot runs on, if the device still reports it. */
+export function engineOf(bot: Pick<BotRow, 'engine'>, device: DeviceRow | undefined): ProviderInfo | undefined {
+  return device?.providers.find((p) => p.id === bot.engine);
+}
+
+export function engineState(engine: ProviderInfo | undefined): { label: string; tone: 'on' | 'warn' | 'off' } {
+  return engine ? botState(engine) : { label: 'Silnik niedostępny', tone: 'off' };
 }
 
 export function botState(p: ProviderInfo): { label: string; tone: 'on' | 'warn' | 'off' } {

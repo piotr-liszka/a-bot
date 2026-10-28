@@ -1,10 +1,10 @@
-import type { ConversationRow, ProviderInfo } from '@a-bot/shared';
+import type { BotRow, ConversationRow } from '@a-bot/shared';
 import { Plus, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { groupLabel, shortTime } from '../lib/format';
 
 interface Props {
-  bot?: ProviderInfo;
+  bot?: BotRow;
   conversations: ConversationRow[];
   loading: boolean;
   selectedId?: string;

@@ -1,15 +1,18 @@
-import { isDeviceOnline, type ConversationRow, type DeviceRow } from '@a-bot/shared';
+import { isDeviceOnline, type BotRow, type ConversationRow, type DeviceRow } from '@a-bot/shared';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
-import { useEffect, useMemo, useState } from 'react';
-import { useConversations, useDevices, useNow } from '../lib/data';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useBots, useConversations, useDevices, useNow } from '../lib/data';
 import { bridge } from '../lib/desktopApi';
+import { engineOf } from '../lib/format';
 import { useWorkers } from '../lib/workers';
+import { BotEditor } from './BotEditor';
 import { Chat } from './Chat';
 import { ConversationList } from './ConversationList';
 import { DesktopView } from './DesktopView';
 import { DevicesPage } from './DevicesPage';
 import { NeedsWorker } from './NeedsWorker';
 import { Rail, type View } from './Rail';
+import { AccountPage, AccountsPage, SettingsNav, type SettingsSection } from './Settings';
 import { TerminalView } from './TerminalView';
 
 function remembered(key: string): string | undefined {
@@ -28,67 +31,77 @@ function remember(key: string, value: string | undefined) {
   }
 }
 
-export function Workspace({ db, session }: { db: SupabaseClient; session: Session }) {
+/** Keeps a view mounted while hidden, so the desktop and terminal sessions survive switching away. */
+function Keep({ active, children }: { active: boolean; children: ReactNode }) {
+  return (
+    <div className="keep" hidden={!active}>
+      {children}
+    </div>
+  );
+}
+
+interface Props {
+  db: SupabaseClient;
+  session: Session;
+  onChangeBackend: () => void;
+}
+
+export function Workspace({ db, session, onChangeBackend }: Props) {
   const uid = session.user.id;
   const devices = useDevices(db, uid);
+  const bots = useBots(db, uid);
   const conversations = useConversations(db, uid);
   const now = useNow();
 
   const workers = useWorkers();
   const [view, setView] = useState<View>('chat');
+  const [section, setSection] = useState<SettingsSection>('devices');
+  const [editing, setEditing] = useState<string>('new');
   const [deviceId, setDeviceId] = useState<string | undefined>(() => remembered('device'));
   const [botId, setBotId] = useState<string | undefined>(() => remembered('bot'));
   const [conversationId, setConversationId] = useState<string | undefined>();
+  const [visited, setVisited] = useState({ desktop: false, terminal: false });
 
   const device: DeviceRow | undefined = devices.rows.find((d) => d.id === deviceId) ?? devices.rows[0];
-  const bots = device?.providers ?? [];
-  const bot = bots.find((b) => b.id === botId) ?? bots.find((b) => b.installed && b.authenticated) ?? bots[0];
+  const deviceBots = useMemo(() => bots.rows.filter((b) => b.device_id === device?.id), [bots.rows, device?.id]);
+  const bot: BotRow | undefined = deviceBots.find((b) => b.id === botId) ?? deviceBots[0];
 
   useEffect(() => remember('device', device?.id), [device?.id]);
   useEffect(() => remember('bot', bot?.id), [bot?.id]);
 
-  const botConversations = useMemo(
-    () => conversations.rows.filter((c) => c.device_id === device?.id && c.provider_id === bot?.id),
-    [conversations.rows, device?.id, bot?.id],
-  );
-  const busyBots = useMemo(
-    () => new Set(conversations.rows.filter((c) => c.busy && c.device_id === device?.id).map((c) => c.provider_id)),
-    [conversations.rows, device?.id],
-  );
+  const botConversations = useMemo(() => conversations.rows.filter((c) => c.bot_id && c.bot_id === bot?.id), [conversations.rows, bot?.id]);
+  const busyBots = useMemo(() => new Set(conversations.rows.filter((c) => c.busy && c.bot_id).map((c) => c.bot_id!)), [conversations.rows]);
   const conversation: ConversationRow | undefined = botConversations.find((c) => c.id === conversationId);
 
   const online = device ? isDeviceOnline(device, now) : false;
-  const showDevices = view === 'devices' || (!devices.loading && devices.rows.length === 0);
   const worker = device ? workers.workers.find((w) => w.deviceId === device.id) : undefined;
-  const fullWidth = showDevices || view === 'desktop' || view === 'terminal';
+  const noDevices = !devices.loading && devices.rows.length === 0;
+  const effectiveView: View = noDevices ? 'settings' : view;
+  const effectiveSection: SettingsSection = noDevices ? 'devices' : section;
+  const needsFirstBot = effectiveView === 'chat' && !bots.loading && Boolean(device) && deviceBots.length === 0;
 
-  return (
-    <div className={fullWidth ? 'shell no-list' : 'shell'}>
-      <Rail
-        db={db}
-        email={session.user.email ?? ''}
-        devices={devices.rows}
-        device={device}
-        online={online}
-        now={now}
-        bot={view === 'chat' ? bot : undefined}
-        busyBots={busyBots}
-        view={showDevices ? 'devices' : view}
-        canUseWorker={Boolean(bridge())}
-        onSelectView={(v) => setView(v)}
-        onSelectDevice={(id) => {
-          setDeviceId(id);
-          setConversationId(undefined);
-          setView('chat');
-        }}
-        onSelectBot={(id) => {
-          setBotId(id);
-          setConversationId(undefined);
-          setView('chat');
-        }}
-        onShowDevices={() => setView('devices')}
-      />
-      {showDevices ? (
+  const desktopActive = effectiveView === 'desktop';
+  const terminalActive = effectiveView === 'settings' && effectiveSection === 'terminal';
+  useEffect(() => {
+    if (desktopActive || terminalActive) setVisited((v) => ({ desktop: v.desktop || desktopActive, terminal: v.terminal || terminalActive }));
+  }, [desktopActive, terminalActive]);
+
+  const openSettings = (s: SettingsSection) => {
+    setSection(s);
+    setView('settings');
+  };
+  const editBot = (id: string) => {
+    setEditing(id);
+    setView('bot');
+  };
+
+  const fullWidth = effectiveView === 'desktop' || effectiveView === 'bot' || needsFirstBot;
+  const editedBot = editing === 'new' ? undefined : bots.rows.find((b) => b.id === editing);
+
+  let main: ReactNode = null;
+  if (effectiveView === 'settings') {
+    if (effectiveSection === 'devices')
+      main = (
         <DevicesPage
           db={db}
           devices={devices.rows}
@@ -101,48 +114,103 @@ export function Workspace({ db, session }: { db: SupabaseClient; session: Sessio
             setView('chat');
           }}
         />
-      ) : (view === 'desktop' || view === 'terminal') && device ? (
-        worker ? (
-          view === 'desktop' ? (
-            <DesktopView key={worker.id} device={device} worker={worker} />
-          ) : (
-            <TerminalView key={worker.id} device={device} worker={worker} />
-          )
-        ) : (
-          <NeedsWorker db={db} device={device} view={view} onLinked={workers.reload} />
-        )
-      ) : (
-        <>
-          <ConversationList
-            bot={bot}
-            conversations={botConversations}
-            loading={conversations.loading}
-            selectedId={conversation?.id}
-            onSelect={setConversationId}
-            onNew={() => setConversationId(undefined)}
-          />
-          {device && bot ? (
-            <Chat
-              key={`${device.id}:${bot.id}:${conversation?.id ?? 'new'}`}
-              db={db}
-              device={device}
-              online={online}
-              bot={bot}
-              conversation={conversation}
-              onCreated={setConversationId}
-              onDeleted={() => setConversationId(undefined)}
-            />
-          ) : (
-            <main className="chat">
-              <div className="intro">
-                <div className="intro-inner">
-                  <h1>Czekam na listę botów</h1>
-                  <p>Agent na urządzeniu „{device?.name}” jeszcze nie przysłał listy zainstalowanych botów. Upewnij się, że kontener działa.</p>
-                </div>
-              </div>
-            </main>
-          )}
-        </>
+      );
+    else if (effectiveSection === 'accounts')
+      main = <AccountsPage db={db} devices={devices.rows} now={now} workers={workers.workers} onOpenDevices={() => setSection('devices')} />;
+    else if (effectiveSection === 'account') main = <AccountPage db={db} email={session.user.email ?? ''} onChangeBackend={onChangeBackend} />;
+    else if (device && !worker) main = <NeedsWorker db={db} device={device} view="terminal" onLinked={workers.reload} />;
+  } else if (effectiveView === 'desktop') {
+    if (device && !worker) main = <NeedsWorker db={db} device={device} view="desktop" onLinked={workers.reload} />;
+  } else if (device && (effectiveView === 'bot' || needsFirstBot)) {
+    main = (
+      <BotEditor
+        key={needsFirstBot ? 'first' : editing}
+        db={db}
+        device={device}
+        bot={needsFirstBot ? undefined : editedBot}
+        first={needsFirstBot}
+        onSaved={(b) => {
+          setBotId(b.id);
+          setConversationId(undefined);
+          setView('chat');
+        }}
+        onDeleted={() => {
+          setBotId(undefined);
+          setConversationId(undefined);
+          setView('chat');
+        }}
+        onCancel={needsFirstBot ? undefined : () => setView('chat')}
+        onOpenAccounts={() => openSettings('accounts')}
+      />
+    );
+  } else if (device && bot) {
+    main = (
+      <>
+        <ConversationList
+          bot={bot}
+          conversations={botConversations}
+          loading={conversations.loading}
+          selectedId={conversation?.id}
+          onSelect={setConversationId}
+          onNew={() => setConversationId(undefined)}
+        />
+        <Chat
+          key={`${bot.id}:${conversation?.id ?? 'new'}`}
+          db={db}
+          device={device}
+          online={online}
+          bot={bot}
+          engine={engineOf(bot, device)}
+          conversation={conversation}
+          onCreated={setConversationId}
+          onDeleted={() => setConversationId(undefined)}
+          onEditBot={() => editBot(bot.id)}
+          onOpenAccounts={() => openSettings('accounts')}
+        />
+      </>
+    );
+  }
+
+  return (
+    <div className={fullWidth ? 'shell no-list' : 'shell'}>
+      <Rail
+        email={session.user.email ?? ''}
+        devices={devices.rows}
+        device={device}
+        online={online}
+        now={now}
+        bots={deviceBots}
+        botId={bot?.id}
+        busyBots={busyBots}
+        view={effectiveView}
+        canUseWorker={Boolean(bridge())}
+        onSelectView={(v) => setView(v)}
+        onSelectDevice={(id) => {
+          setDeviceId(id);
+          setBotId(undefined);
+          setConversationId(undefined);
+          if (view !== 'desktop') setView('chat');
+        }}
+        onSelectBot={(id) => {
+          setBotId(id);
+          setConversationId(undefined);
+          setView('chat');
+        }}
+        onNewBot={() => editBot('new')}
+        onAddDevice={() => openSettings('devices')}
+        onOpenSettings={() => openSettings(section)}
+      />
+      {effectiveView === 'settings' && <SettingsNav section={effectiveSection} onSelect={setSection} />}
+      {main}
+      {device && worker && visited.desktop && (
+        <Keep active={desktopActive}>
+          <DesktopView key={worker.id} device={device} worker={worker} />
+        </Keep>
+      )}
+      {device && worker && visited.terminal && (
+        <Keep active={terminalActive}>
+          <TerminalView key={worker.id} device={device} worker={worker} />
+        </Keep>
       )}
     </div>
   );

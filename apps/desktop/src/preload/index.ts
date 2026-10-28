@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld('abot', {
     onProgress: (listener: (e: unknown) => void) => on('workers:progress', listener),
   },
   terminal: {
-    open: (id: string, cols: number, rows: number) => ipcRenderer.invoke('terminal:open', id, cols, rows),
+    open: (id: string, kind: string, cols: number, rows: number) => ipcRenderer.invoke('terminal:open', id, kind, cols, rows),
     write: (termId: string, data: string) => ipcRenderer.send('terminal:write', termId, data),
     resize: (termId: string, cols: number, rows: number) => ipcRenderer.send('terminal:resize', termId, cols, rows),
     close: (termId: string) => ipcRenderer.send('terminal:close', termId),

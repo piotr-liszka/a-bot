@@ -169,6 +169,24 @@ function writeRemote(s: SFTPWrapper, path: string, content: string) {
   return new Promise<void>((resolve, reject) => s.writeFile(path, content, { mode: 0o600 }, (err) => (err ? reject(err) : resolve())));
 }
 
+export type TerminalKind = 'shell' | 'claude-login' | 'codex-login';
+export type ExecCommand = 'browser' | 'restart' | 'claude-logout' | 'codex-logout';
+
+// Fixed command lines only; the renderer picks one by name.
+const TERMINALS: Record<TerminalKind, string> = {
+  // One long-lived tmux session, so leaving and reopening the tab reattaches to the same shell.
+  shell: `sh -c 'if command -v tmux >/dev/null; then exec tmux new-session -A -s main; else exec bash -l; fi'`,
+  'claude-login': 'claude auth login',
+  'codex-login': 'codex login --device-auth',
+};
+
+const EXEC_COMMANDS: Record<ExecCommand, string> = {
+  browser: 'docker exec -d a-bot browser',
+  restart: 'docker restart a-bot',
+  'claude-logout': 'docker exec a-bot claude auth logout 2>&1',
+  'codex-logout': 'docker exec a-bot codex logout 2>&1',
+};
+
 const shellQuote = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
 
 export class WorkerManager {
@@ -332,17 +350,17 @@ export class WorkerManager {
     return { url: `ws://127.0.0.1:${tunnel.port}/websockify`, password: pw.out.trim() };
   }
 
-  async exec(id: string, command: 'browser' | 'restart'): Promise<void> {
+  async exec(id: string, command: ExecCommand): Promise<string> {
     const c = await this.client(id);
-    if (command === 'browser') await run(c, 'docker exec -d a-bot browser');
-    if (command === 'restart') await run(c, 'docker restart a-bot');
+    const res = await run(c, EXEC_COMMANDS[command]);
+    return res.out.trim();
   }
 
-  async openTerminal(id: string, cols: number, rows: number, sender: WebContents): Promise<string> {
+  async openTerminal(id: string, kind: TerminalKind, cols: number, rows: number, sender: WebContents): Promise<string> {
     const c = await this.client(id);
     const termId = randomUUID();
     const stream = await new Promise<ClientChannel>((resolve, reject) =>
-      c.exec('docker exec -it -e TERM=xterm-256color -e COLORTERM=truecolor -w /workspace a-bot bash -l', { pty: { term: 'xterm-256color', cols, rows } }, (err, s) =>
+      c.exec(`docker exec -it -e TERM=xterm-256color -e COLORTERM=truecolor -e LANG=C.UTF-8 -w /workspace a-bot ${TERMINALS[kind]}`, { pty: { term: 'xterm-256color', cols, rows } }, (err, s) =>
         err ? reject(err) : resolve(s),
       ),
     );

@@ -27,11 +27,11 @@ export function DevicesPage({ db, devices, loading, now, workers, onWorkersChang
         <div className="page-inner">
           <div>
             <div className="page-head">
-              <h1>{first ? 'Dodaj swojego pierwszego workera' : 'Workery'}</h1>
+              <h1>{first ? 'Dodaj swojego pierwszego workera' : 'Urządzenia'}</h1>
             </div>
             <p className="page-lede">
               Worker to dowolny komputer lub serwer z Dockerem. Działa na nim jeden wspólny sandbox z Linuksem, pulpitem i przeglądarką, w którym pracują
-              wszystkie boty. Wybrany katalog jest w nim widoczny jako <code>/workspace</code>.
+              wszystkie Twoje boty. Wybrany katalog jest w nim widoczny jako <code>/workspace</code>.
             </p>
           </div>
           {loading && <div className="skeleton" style={{ height: 120 }} />}
@@ -125,7 +125,7 @@ function DeviceCard({ db, device, online, now, worker, onWorkersChanged }: CardP
             {details ? ` · ${details}` : ''}
           </div>
         </div>
-        <button className="icon-btn" onClick={refresh} disabled={!online || refreshing} title="Wykryj boty ponownie" aria-label="Wykryj boty ponownie">
+        <button className="icon-btn" onClick={refresh} disabled={!online || refreshing} title="Wykryj silniki ponownie" aria-label="Wykryj silniki ponownie">
           <RefreshCw size={15} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} />
         </button>
         <button className="icon-btn" onClick={() => setRenaming(true)} title="Zmień nazwę" aria-label="Zmień nazwę">
@@ -150,7 +150,7 @@ function DeviceCard({ db, device, online, now, worker, onWorkersChanged }: CardP
         <table className="providers">
           <thead>
             <tr>
-              <th>Bot</th>
+              <th>Silnik</th>
               <th>Stan</th>
               <th>Wersja</th>
             </tr>
@@ -184,7 +184,7 @@ function DeviceCard({ db, device, online, now, worker, onWorkersChanged }: CardP
         </table>
       ) : (
         <p className="hint" style={{ padding: '0 16px 14px' }}>
-          Agent jeszcze nie przysłał listy botów.
+          Agent jeszcze nie przysłał listy silników.
         </p>
       )}
       {bridge() && (
@@ -332,8 +332,8 @@ docker compose -p a-bot up -d --build`;
         </li>
         <li>
           <div>
-            <strong>Zaloguj boty w kontenerze (raz)</strong>
-            <p>Logowanie zostaje w wolumenie kontenera. Ollama na hoście jest wykrywana automatycznie.</p>
+            <strong>Zaloguj silniki (raz)</strong>
+            <p>W aplikacji desktopowej: Ustawienia → Konta modeli. Albo ręcznie na workerze. Logowanie zostaje w wolumenie kontenera, a Ollama na hoście jest wykrywana automatycznie.</p>
             <CopyBlock text={'docker exec -it a-bot claude auth login\ndocker exec -it a-bot codex login --device-auth'} />
           </div>
         </li>

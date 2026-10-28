@@ -119,12 +119,13 @@ export const claudeProvider: Provider = {
     } catch {
       info.authenticated = s.code === 0;
     }
-    if (!info.authenticated) info.setupHint = 'Zaloguj w zakładce Terminal: claude auth login';
+    if (!info.authenticated) info.setupHint = 'Zaloguj w Ustawienia → Konta modeli albo w kontenerze: claude auth login';
     return info;
   },
   async run(ctx) {
     const args = ['-p', ctx.prompt, '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--dangerously-skip-permissions'];
     if (ctx.model) args.push('--model', ctx.model);
+    if (ctx.instructions) args.push('--append-system-prompt', ctx.instructions);
     if (ctx.sessionId) args.push('--resume', ctx.sessionId);
     const parser = createClaudeParser(ctx.emit);
     // IS_SANDBOX lets Claude Code skip permission prompts while running as root inside the container.

@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, nativeTheme, shell } from 'electron';
 import { join } from 'node:path';
-import { WorkerManager, type InstallOptions, type WorkerInput } from './workers';
+import { WorkerManager, type ExecCommand, type InstallOptions, type TerminalKind, type WorkerInput } from './workers';
 
 const workers = new WorkerManager();
 
@@ -12,8 +12,8 @@ function registerIpc() {
   ipcMain.handle('workers:test', (_e, input: WorkerInput) => workers.test(input));
   ipcMain.handle('workers:install', (e, id: string, opts: InstallOptions) => workers.install(id, opts, e.sender));
   ipcMain.handle('workers:desktop', (_e, id: string) => workers.desktop(id));
-  ipcMain.handle('workers:exec', (_e, id: string, command: 'browser' | 'restart') => workers.exec(id, command));
-  ipcMain.handle('terminal:open', (e, id: string, cols: number, rows: number) => workers.openTerminal(id, cols, rows, e.sender));
+  ipcMain.handle('workers:exec', (_e, id: string, command: ExecCommand) => workers.exec(id, command));
+  ipcMain.handle('terminal:open', (e, id: string, kind: TerminalKind, cols: number, rows: number) => workers.openTerminal(id, kind, cols, rows, e.sender));
   ipcMain.on('terminal:write', (_e, termId: string, data: string) => workers.writeTerminal(termId, data));
   ipcMain.on('terminal:resize', (_e, termId: string, cols: number, rows: number) => workers.resizeTerminal(termId, cols, rows));
   ipcMain.on('terminal:close', (_e, termId: string) => workers.closeTerminal(termId));

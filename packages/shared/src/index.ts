@@ -1,7 +1,7 @@
 // Types shared by the desktop app and the device agent.
 // Row types mirror the Postgres tables in supabase/migrations.
 
-export type ProviderKind = 'claude' | 'codex' | 'ollama' | 'shell' | 'custom';
+export type ProviderKind = 'claude' | 'codex' | 'ollama' | 'custom';
 
 export interface ProviderInfo {
   id: string;
@@ -32,10 +32,26 @@ export interface DeviceRow {
   created_at: string;
 }
 
+/** A bot the person created: a name on top of an engine detected on the device. */
+export interface BotRow {
+  id: string;
+  owner_id: string;
+  device_id: string;
+  name: string;
+  /** Provider id on the device: claude, codex, ollama or a custom one. */
+  engine: string;
+  model: string | null;
+  instructions: string | null;
+  color: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ConversationRow {
   id: string;
   owner_id: string;
   device_id: string;
+  bot_id: string | null;
   provider_id: string;
   model: string | null;
   title: string;

@@ -5,14 +5,13 @@ interface Props {
   botName: string;
   disabled: boolean;
   running: boolean;
-  blocked?: { text: string; hint?: string; hard: boolean };
+  blocked?: { text: string; hint?: string; action?: { label: string; onClick: () => void }; hard: boolean };
   error?: string;
-  isShell: boolean;
   onSend: (text: string) => Promise<boolean>;
   onStop: () => void;
 }
 
-export function Composer({ botName, disabled, running, blocked, error, isShell, onSend, onStop }: Props) {
+export function Composer({ botName, disabled, running, blocked, error, onSend, onStop }: Props) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -52,6 +51,14 @@ export function Composer({ botName, disabled, running, blocked, error, isShell, 
           <span>
             {blocked.text}
             {blocked.hint && <> {renderHint(blocked.hint)}</>}
+            {blocked.action && (
+              <>
+                {' '}
+                <button className="link-btn" onClick={blocked.action.onClick}>
+                  {blocked.action.label}
+                </button>
+              </>
+            )}
           </span>
         </div>
       )}
@@ -66,10 +73,8 @@ export function Composer({ botName, disabled, running, blocked, error, isShell, 
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={isShell ? 'Polecenie bash, np. ls -la /workspace' : `Napisz do ${botName}…`}
+          placeholder={`Napisz do ${botName}…`}
           disabled={disabled}
-          spellCheck={!isShell}
-          style={isShell ? { fontFamily: 'var(--mono)', fontSize: 13 } : undefined}
         />
         <div className="composer-bar">
           <span className="hint">{error ? <span className="form-error">{error}</span> : running ? 'Bot pracuje. Możesz go zatrzymać.' : 'Enter wysyła, Shift+Enter dodaje nową linię'}</span>

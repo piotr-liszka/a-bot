@@ -13,9 +13,11 @@ if (args[0] === 'auth' && args[1] === 'status') {
   process.exit(0);
 }
 const prompt = args[args.indexOf('-p') + 1] ?? '';
+const instructions = args.includes('--append-system-prompt') ? args[args.indexOf('--append-system-prompt') + 1] : '';
 const words = (text) => text.split(/(?<= )/);
 
 (async () => {
+  if (prompt.includes('SLEEP')) await sleep(30_000);
   out({ type: 'system', subtype: 'init', session_id: 'fake-session-1', model: 'sonnet' });
   out({ type: 'stream_event', event: { type: 'message_start' } });
   for (const w of words('Sprawdzę, co jest w katalogu roboczym. ')) {
@@ -29,7 +31,7 @@ const words = (text) => text.split(/(?<= )/);
   await sleep(500);
   out({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'tu2', content: '# Notatki\n- dokończyć POC' }] } });
   out({ type: 'stream_event', event: { type: 'message_start' } });
-  const answer = `W \`/workspace\` są dwie rzeczy:\n\n| Nazwa | Typ |\n|---|---|\n| \`notatki.md\` | plik, 220 B |\n| \`projekt/\` | katalog |\n\nW notatkach jest jedno zadanie: **dokończyć POC**. (Pytanie: „${prompt.slice(0, 60)}”.)`;
+  const answer = `W \`/workspace\` są dwie rzeczy:\n\n| Nazwa | Typ |\n|---|---|\n| \`notatki.md\` | plik, 220 B |\n| \`projekt/\` | katalog |\n\nW notatkach jest jedno zadanie: **dokończyć POC**. (Pytanie: „${prompt.slice(0, 60)}”.)${instructions ? ` Instrukcje bota: ${instructions}` : ''}`;
   for (const w of words(answer)) {
     out({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: w } } });
     await sleep(25);

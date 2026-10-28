@@ -1,4 +1,4 @@
-import type { ConversationRow, DeviceRow, MessageRow } from '@a-bot/shared';
+import type { BotRow, ConversationRow, DeviceRow, MessageRow } from '@a-bot/shared';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
 
@@ -13,7 +13,7 @@ export function useSession(db: SupabaseClient): Session | null | undefined {
 }
 
 interface LiveOptions {
-  table: 'devices' | 'conversations' | 'messages';
+  table: 'devices' | 'bots' | 'conversations' | 'messages';
   column: string;
   value: string | undefined;
   orderBy: string;
@@ -75,6 +75,10 @@ function useLiveRows<T extends { id: string }>(db: SupabaseClient, opts: LiveOpt
 
 export function useDevices(db: SupabaseClient, uid: string | undefined) {
   return useLiveRows<DeviceRow>(db, { table: 'devices', column: 'owner_id', value: uid, orderBy: 'created_at', ascending: true });
+}
+
+export function useBots(db: SupabaseClient, uid: string | undefined) {
+  return useLiveRows<BotRow>(db, { table: 'bots', column: 'owner_id', value: uid, orderBy: 'created_at', ascending: true });
 }
 
 export function useConversations(db: SupabaseClient, uid: string | undefined) {

@@ -1,14 +1,14 @@
 # a-bot
 
 Chat with AI bots that live on **your own machine**. a-bot is an open-source desktop app (mobile later) for talking to
-Claude Code, Codex, local Ollama models or a plain terminal, all running inside **one shared Linux container** on any
+bots you create yourself, each running on an engine such as Claude Code, Codex or a local Ollama model, all inside **one shared Linux container** on any
 device you choose, using **your own subscriptions**.
 
 ```
 ┌──────────────┐   Supabase (Postgres + Realtime + Auth)   ┌─────────────────────────────────────┐
 │ a-bot app    │ ◄──────────────────────────────────────► │ your device: docker container       │
 │ (Electron)   │   history, live streaming, pairing        │  a-bot agent → claude / codex /     │
-└──────────────┘                                           │  ollama / bash, Chromium, /workspace│
+└──────────────┘                                           │  ollama, Chromium, /workspace       │
                                                            └─────────────────────────────────────┘
 ```
 
@@ -17,7 +17,8 @@ device you choose, using **your own subscriptions**.
 - **No open ports.** The agent dials out to Supabase; desktop and terminal go through your SSH connection.
 - **One box for all bots.** A small Debian container with your host folder mounted at `/workspace`, root inside,
   Chromium + Playwright MCP so bots can browse. Install anything you like; it persists.
-- **Bots are detected, not configured.** The agent reports which CLIs are installed and logged in; the app shows it.
+- **Engines are detected, bots are yours.** The agent reports which CLIs (engines) are installed and logged in. You
+  create bots on top of them: a name, an engine, optionally a model (e.g. `opus`, `llama3.1`) and standing instructions.
 
 ## Repository
 
@@ -35,8 +36,10 @@ device you choose, using **your own subscriptions**.
 1. Open the desktop app and create an account (or sign in).
 2. **Add a worker over SSH**: host, user, key or password of any machine with Docker. The app uploads the sandbox,
    builds and starts it there, and pairs it with your account automatically.
-3. Chat with the bots on that worker. Switch to **Pulpit** to watch the sandbox's Linux desktop (the same Chromium the
-   bots drive), or to **Terminal** for a root shell inside the sandbox, e.g. to run `claude auth login` once.
+3. Log in the engines once in **Ustawienia → Konta modeli** (runs `claude auth login` / `codex login` in the sandbox).
+4. Create a bot and chat with it. Switch to **Pulpit** to watch the sandbox's Linux desktop (the same Chromium the bots
+   drive). **Ustawienia → Terminal** is a root shell inside the sandbox; it runs in tmux, so the session survives
+   closing the view or the app.
 
 Supabase remembers sessions and history and shows which workers are live. SSH credentials stay on your computer
 (encrypted with the OS keychain); the desktop and terminal travel through the SSH connection, nothing is exposed.

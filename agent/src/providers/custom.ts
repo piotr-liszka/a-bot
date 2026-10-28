@@ -39,7 +39,7 @@ export function customProvider(cfg: CustomProviderConfig): Provider {
       };
     },
     async run(ctx) {
-      const args = cfg.command.slice(1).map((a) => a.replaceAll('{prompt}', ctx.prompt).replaceAll('{model}', ctx.model ?? ''));
+      const args = cfg.command.slice(1).map((a) => a.replaceAll('{prompt}', ctx.prompt).replaceAll('{model}', ctx.model ?? '').replaceAll('{instructions}', ctx.instructions ?? ''));
       let first = true;
       const res = await streamLines(bin, args, {
         cwd: ctx.cwd,
