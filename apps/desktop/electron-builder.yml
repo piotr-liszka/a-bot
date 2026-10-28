@@ -8,6 +8,10 @@ files:
   - out/preload/**
   - out/renderer/**
   - package.json
+extraResources:
+  - from: ../../dist/box
+    to: box
+    filter: ['**/*', '!Dockerfile.*', '!proxy-ca.crt', '!.env']
 mac:
   category: public.app-category.developer-tools
   target: [dmg]

@@ -1,11 +1,13 @@
 import type { DeviceRow, ProviderInfo } from '@a-bot/shared';
 import { isDeviceOnline } from '@a-bot/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ChevronsUpDown, LogOut, Plus, Server } from 'lucide-react';
+import { ChevronsUpDown, LogOut, MessageSquare, Monitor, Plus, Server, SquareTerminal } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { botState, relativeSeen } from '../lib/format';
 import { BotAvatar } from './BotAvatar';
 import { Brand } from './GateSide';
+
+export type View = 'chat' | 'desktop' | 'terminal' | 'devices';
 
 interface Props {
   db: SupabaseClient;
@@ -16,7 +18,9 @@ interface Props {
   now: number;
   bot?: ProviderInfo;
   busyBots: Set<string>;
-  view: 'chat' | 'devices';
+  view: View;
+  canUseWorker: boolean;
+  onSelectView: (view: View) => void;
   onSelectDevice: (id: string) => void;
   onSelectBot: (id: string) => void;
   onShowDevices: () => void;
@@ -83,6 +87,22 @@ export function Rail(p: Props) {
             )}
           </div>
         )}
+        {p.device && p.canUseWorker && (
+          <div className="view-tabs" role="group" aria-label="Widok urządzenia">
+            {(
+              [
+                ['chat', 'Czat', MessageSquare],
+                ['desktop', 'Pulpit', Monitor],
+                ['terminal', 'Terminal', SquareTerminal],
+              ] as const
+            ).map(([v, label, Icon]) => (
+              <button key={v} aria-pressed={p.view === v} onClick={() => p.onSelectView(v)} title={label}>
+                <Icon size={14} aria-hidden />
+                <span className="meta">{label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {p.device && (
@@ -96,7 +116,7 @@ export function Rail(p: Props) {
                 <li key={b.id}>
                   <button
                     className={`bot-item${state.tone === 'on' ? '' : ' unavailable'}`}
-                    aria-current={p.bot?.id === b.id}
+                    aria-current={p.view === 'chat' && p.bot?.id === b.id}
                     onClick={() => p.onSelectBot(b.id)}
                     title={`${b.name}: ${working ? 'pracuje' : state.label}`}
                   >

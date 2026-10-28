@@ -2,10 +2,15 @@ import { isDeviceOnline, type ConversationRow, type DeviceRow } from '@a-bot/sha
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { useEffect, useMemo, useState } from 'react';
 import { useConversations, useDevices, useNow } from '../lib/data';
+import { bridge } from '../lib/desktopApi';
+import { useWorkers } from '../lib/workers';
 import { Chat } from './Chat';
 import { ConversationList } from './ConversationList';
+import { DesktopView } from './DesktopView';
 import { DevicesPage } from './DevicesPage';
-import { Rail } from './Rail';
+import { NeedsWorker } from './NeedsWorker';
+import { Rail, type View } from './Rail';
+import { TerminalView } from './TerminalView';
 
 function remembered(key: string): string | undefined {
   try {
@@ -29,7 +34,8 @@ export function Workspace({ db, session }: { db: SupabaseClient; session: Sessio
   const conversations = useConversations(db, uid);
   const now = useNow();
 
-  const [view, setView] = useState<'chat' | 'devices'>('chat');
+  const workers = useWorkers();
+  const [view, setView] = useState<View>('chat');
   const [deviceId, setDeviceId] = useState<string | undefined>(() => remembered('device'));
   const [botId, setBotId] = useState<string | undefined>(() => remembered('bot'));
   const [conversationId, setConversationId] = useState<string | undefined>();
@@ -53,9 +59,11 @@ export function Workspace({ db, session }: { db: SupabaseClient; session: Sessio
 
   const online = device ? isDeviceOnline(device, now) : false;
   const showDevices = view === 'devices' || (!devices.loading && devices.rows.length === 0);
+  const worker = device ? workers.workers.find((w) => w.deviceId === device.id) : undefined;
+  const fullWidth = showDevices || view === 'desktop' || view === 'terminal';
 
   return (
-    <div className={showDevices ? 'shell no-list' : 'shell'}>
+    <div className={fullWidth ? 'shell no-list' : 'shell'}>
       <Rail
         db={db}
         email={session.user.email ?? ''}
@@ -65,7 +73,9 @@ export function Workspace({ db, session }: { db: SupabaseClient; session: Sessio
         now={now}
         bot={view === 'chat' ? bot : undefined}
         busyBots={busyBots}
-        view={showDevices ? 'devices' : 'chat'}
+        view={showDevices ? 'devices' : view}
+        canUseWorker={Boolean(bridge())}
+        onSelectView={(v) => setView(v)}
         onSelectDevice={(id) => {
           setDeviceId(id);
           setConversationId(undefined);
@@ -79,10 +89,28 @@ export function Workspace({ db, session }: { db: SupabaseClient; session: Sessio
         onShowDevices={() => setView('devices')}
       />
       {showDevices ? (
-        <DevicesPage db={db} devices={devices.rows} loading={devices.loading} now={now} onPaired={(d) => {
-          setDeviceId(d.id);
-          setView('chat');
-        }} />
+        <DevicesPage
+          db={db}
+          devices={devices.rows}
+          loading={devices.loading}
+          now={now}
+          workers={workers.workers}
+          onWorkersChanged={workers.reload}
+          onPaired={(d) => {
+            setDeviceId(d.id);
+            setView('chat');
+          }}
+        />
+      ) : (view === 'desktop' || view === 'terminal') && device ? (
+        worker ? (
+          view === 'desktop' ? (
+            <DesktopView key={worker.id} device={device} worker={worker} />
+          ) : (
+            <TerminalView key={worker.id} device={device} worker={worker} />
+          )
+        ) : (
+          <NeedsWorker db={db} device={device} view={view} onLinked={workers.reload} />
+        )
       ) : (
         <>
           <ConversationList

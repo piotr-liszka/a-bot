@@ -1,26 +1,24 @@
-# Runs the a-bot shared box on this machine.
-#   cp .env.example .env   # fill in backend URL and key
-#   docker compose up -d
-#   docker compose logs -f   # shows the pairing code on first start
+# The a-bot sandbox on one worker. The desktop app writes .env next to this file and runs
+#   docker compose -p a-bot up -d --build
+# You can do the same by hand: npm run box:pack, then copy dist/box to the worker.
 services:
   a-bot:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
+    build: .
     image: a-bot-box:latest
     container_name: a-bot
-    hostname: ${A_BOT_DEVICE_NAME:-a-bot}
+    hostname: a-bot
     restart: unless-stopped
     env_file: .env
     environment:
       OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
     extra_hosts:
       - host.docker.internal:host-gateway
+    ports:
+      - 127.0.0.1:${A_BOT_DESKTOP_PORT:-6080}:6080
     volumes:
       - ${A_BOT_WORKSPACE_DIR:-./workspace}:/workspace
       - a-bot-home:/root
     shm_size: 1gb
-    init: false
 
 volumes:
   a-bot-home:

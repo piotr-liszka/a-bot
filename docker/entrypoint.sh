@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
-# Prepares the shared box on every start (idempotent), then runs the agent.
+# Prepares the sandbox on every start (idempotent), then hands over to supervisord.
 set -euo pipefail
 
-mkdir -p "${A_BOT_HOME:-/root/.a-bot}" /workspace
+mkdir -p "${A_BOT_HOME:-/root/.a-bot}" /workspace /root/.vnc
 
-# Give the bots a browser: Playwright MCP driving the system Chromium, headless.
-BROWSER_ARGS=(--headless --browser chromium --executable-path /usr/bin/chromium --no-sandbox)
+# Desktop password: random, kept in the volume. The app reads it over SSH; it is never sent to the backend.
+if [ ! -s /root/.vnc/passwd ]; then
+  head -c 12 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 8 > /root/.a-bot/vnc-password
+  vncpasswd -f < /root/.a-bot/vnc-password > /root/.vnc/passwd
+  chmod 600 /root/.vnc/passwd /root/.a-bot/vnc-password
+fi
+
+# Give the bots a browser on the shared desktop: Playwright MCP driving the system Chromium.
+BROWSER_ARGS=(--browser chromium --executable-path /usr/bin/chromium --no-sandbox --user-data-dir /root/.cache/a-bot-bot-browser)
 
 if command -v claude >/dev/null && ! grep -q '"playwright"' /root/.claude.json 2>/dev/null; then
   claude mcp add --scope user playwright -- playwright-mcp "${BROWSER_ARGS[@]}" >/dev/null 2>&1 || true
@@ -18,7 +25,7 @@ if command -v codex >/dev/null; then
 
 [mcp_servers.playwright]
 command = "playwright-mcp"
-args = ["--headless", "--browser", "chromium", "--executable-path", "/usr/bin/chromium", "--no-sandbox"]
+args = ["--browser", "chromium", "--executable-path", "/usr/bin/chromium", "--no-sandbox", "--user-data-dir", "/root/.cache/a-bot-bot-browser"]
 TOML
   fi
 fi

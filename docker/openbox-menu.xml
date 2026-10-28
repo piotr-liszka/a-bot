@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+  <menu id="root-menu" label="a-bot">
+    <item label="Przeglądarka"><action name="Execute"><command>browser</command></action></item>
+    <item label="Terminal"><action name="Execute"><command>xterm -fa Monospace -fs 11 -bg '#1b1e27' -fg '#e6e8ef'</command></action></item>
+  </menu>
+</openbox_menu>

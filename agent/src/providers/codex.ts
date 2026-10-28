@@ -99,7 +99,7 @@ export const codexProvider: Provider = {
     info.version = v.stdout.trim().replace(/^codex-cli\s*/, '') || undefined;
     const s = await exec('codex', ['login', 'status']);
     info.authenticated = s.code === 0;
-    if (!info.authenticated) info.setupHint = 'Zaloguj kontem ChatGPT: docker exec -it a-bot codex login --device-auth';
+    if (!info.authenticated) info.setupHint = 'Zaloguj w zakładce Terminal: codex login --device-auth';
     return info;
   },
   async run(ctx) {

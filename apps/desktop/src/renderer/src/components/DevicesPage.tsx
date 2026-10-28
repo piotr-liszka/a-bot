@@ -1,46 +1,92 @@
 import { isDeviceOnline, normalizePairingCode, type DeviceRow } from '@a-bot/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { Check, Copy, Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, Copy, KeyRound, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { activeBackend, friendlyError } from '../lib/backend';
+import { bridge, type WorkerInfo } from '../lib/desktopApi';
 import { botState, relativeSeen } from '../lib/format';
 import { BotAvatar } from './BotAvatar';
+import { WorkerForm } from './WorkerForm';
 
 interface Props {
   db: SupabaseClient;
   devices: DeviceRow[];
   loading: boolean;
   now: number;
+  workers: WorkerInfo[];
+  onWorkersChanged: () => void;
   onPaired: (device: DeviceRow) => void;
 }
 
-export function DevicesPage({ db, devices, loading, now, onPaired }: Props) {
+export function DevicesPage({ db, devices, loading, now, workers, onWorkersChanged, onPaired }: Props) {
   const first = !loading && devices.length === 0;
+  const ssh = Boolean(bridge());
   return (
     <main className="chat">
       <div className="page">
         <div className="page-inner">
           <div>
             <div className="page-head">
-              <h1>{first ? 'Dodaj swoje pierwsze urządzenie' : 'Urządzenia'}</h1>
+              <h1>{first ? 'Dodaj swojego pierwszego workera' : 'Workery'}</h1>
             </div>
             <p className="page-lede">
-              Urządzenie to dowolny komputer lub serwer z Dockerem. Działa na nim jeden wspólny kontener z Linuksem, w którym pracują wszystkie boty.
-              Twój katalog jest w nim widoczny jako <code>/workspace</code>.
+              Worker to dowolny komputer lub serwer z Dockerem. Działa na nim jeden wspólny sandbox z Linuksem, pulpitem i przeglądarką, w którym pracują
+              wszystkie boty. Wybrany katalog jest w nim widoczny jako <code>/workspace</code>.
             </p>
           </div>
           {loading && <div className="skeleton" style={{ height: 120 }} />}
           {devices.map((d) => (
-            <DeviceCard key={d.id} db={db} device={d} online={isDeviceOnline(d, now)} now={now} />
+            <DeviceCard
+              key={d.id}
+              db={db}
+              device={d}
+              online={isDeviceOnline(d, now)}
+              now={now}
+              worker={workers.find((w) => w.deviceId === d.id)}
+              onWorkersChanged={onWorkersChanged}
+            />
           ))}
-          <PairForm db={db} onPaired={onPaired} />
+          {ssh ? (
+            <>
+              <section className="pair" aria-labelledby="add-worker">
+                <div>
+                  <h2 id="add-worker">Dodaj workera przez SSH</h2>
+                  <p className="page-lede">Połączę się z komputerem, zbuduję tam sandbox i sparuję go z Twoim kontem. Wystarczy, że ma Dockera.</p>
+                </div>
+                <WorkerForm
+                  key={devices.length}
+                  db={db}
+                  onDone={(d) => {
+                    onWorkersChanged();
+                    onPaired(d);
+                  }}
+                />
+              </section>
+              <details className="manual">
+                <summary>Sandbox uruchomiony ręcznie? Sparuj kodem</summary>
+                <PairForm db={db} onPaired={onPaired} />
+              </details>
+            </>
+          ) : (
+            <PairForm db={db} onPaired={onPaired} />
+          )}
         </div>
       </div>
     </main>
   );
 }
 
-function DeviceCard({ db, device, online, now }: { db: SupabaseClient; device: DeviceRow; online: boolean; now: number }) {
+interface CardProps {
+  db: SupabaseClient;
+  device: DeviceRow;
+  online: boolean;
+  now: number;
+  worker?: WorkerInfo;
+  onWorkersChanged: () => void;
+}
+
+function DeviceCard({ db, device, online, now, worker, onWorkersChanged }: CardProps) {
+  const [editingSsh, setEditingSsh] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(device.name);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -141,6 +187,40 @@ function DeviceCard({ db, device, online, now }: { db: SupabaseClient; device: D
           Agent jeszcze nie przysłał listy botów.
         </p>
       )}
+      {bridge() && (
+        <div className="device-ssh">
+          <KeyRound size={14} aria-hidden />
+          <span className="grow">{worker ? `SSH: ${worker.username}@${worker.host}${worker.port !== 22 ? `:${worker.port}` : ''}` : 'Brak dostępu SSH z tego komputera (pulpit i terminal niedostępne)'}</span>
+          <button className="btn btn-sm" onClick={() => setEditingSsh((v) => !v)}>
+            {editingSsh ? 'Zamknij' : worker ? 'Zainstaluj ponownie' : 'Połącz przez SSH'}
+          </button>
+          {worker && (
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={async () => {
+                await bridge()!.workers.remove(worker.id);
+                onWorkersChanged();
+              }}
+            >
+              Zapomnij SSH
+            </button>
+          )}
+        </div>
+      )}
+      {editingSsh && (
+        <div className="device-edit">
+          <WorkerForm
+            db={db}
+            device={device}
+            worker={worker}
+            onDone={() => {
+              setEditingSsh(false);
+              onWorkersChanged();
+            }}
+            onCancel={() => setEditingSsh(false)}
+          />
+        </div>
+      )}
     </section>
   );
 }
@@ -198,13 +278,14 @@ function PairForm({ db, onPaired }: { db: SupabaseClient; onPaired: (d: DeviceRo
   }
 
   const setup = `git clone https://github.com/piotr-liszka/a-bot && cd a-bot
+npm install && npm run box:pack && cd dist/box
 cat > .env <<'ENV'
 A_BOT_SUPABASE_URL=${backend?.url ?? ''}
 A_BOT_SUPABASE_ANON_KEY=${backend?.anonKey ?? ''}
 A_BOT_DEVICE_NAME=Mój serwer
-A_BOT_WORKSPACE_DIR=./workspace
+A_BOT_WORKSPACE_DIR=$HOME/a-bot-workspace
 ENV
-docker compose up -d --build`;
+docker compose -p a-bot up -d --build`;
 
   return (
     <section className="pair" aria-labelledby="pair-title">
@@ -212,7 +293,7 @@ docker compose up -d --build`;
       <ol className="pair-steps">
         <li>
           <div>
-            <strong>Uruchom kontener a-bot na urządzeniu</strong>
+            <strong>Uruchom sandbox na workerze</strong>
             <p>Potrzebujesz Dockera. Adres serwera i klucz są już wpisane.</p>
             <CopyBlock text={setup} />
           </div>
@@ -220,7 +301,7 @@ docker compose up -d --build`;
         <li>
           <div>
             <strong>Odczytaj kod parowania</strong>
-            <CopyBlock text="docker compose logs a-bot | grep -A1 'Kod parowania'" />
+            <CopyBlock text="docker logs a-bot 2>&1 | grep 'Kod parowania'" />
           </div>
         </li>
         <li>

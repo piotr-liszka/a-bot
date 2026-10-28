@@ -10,24 +10,29 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "web": "vite --config vite.web.config.ts",
-    "dist": "electron-vite build && electron-builder",
+    "dist": "npm run box:pack --prefix ../.. && electron-vite build && electron-builder",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@novnc/novnc": "^1.7.0",
+    "@supabase/supabase-js": "^2.118.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "lucide-react": "^1.63.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "@supabase/supabase-js": "^2.118.0"
+    "ssh2": "^1.17.0"
   },
   "devDependencies": {
     "@a-bot/shared": "*",
     "@types/node": "^22.18.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.2.0",
+    "@types/ssh2": "^1.15.6",
     "@vitejs/plugin-react": "^5.0.0",
     "electron": "^45.1.0",
     "electron-builder": "^26.18.0",

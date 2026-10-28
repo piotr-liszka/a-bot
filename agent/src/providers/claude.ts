@@ -119,7 +119,7 @@ export const claudeProvider: Provider = {
     } catch {
       info.authenticated = s.code === 0;
     }
-    if (!info.authenticated) info.setupHint = 'Zaloguj subskrypcją: docker exec -it a-bot claude auth login';
+    if (!info.authenticated) info.setupHint = 'Zaloguj w zakładce Terminal: claude auth login';
     return info;
   },
   async run(ctx) {

@@ -14,7 +14,7 @@ device you choose, using **your own subscriptions**.
 
 - **Hybrid by design.** Use the hosted a-bot account, or point the app at your own Supabase (cloud free tier or
   self-hosted). Same code either way.
-- **No open ports.** The device agent dials out to Supabase; nothing on your device listens on the internet.
+- **No open ports.** The agent dials out to Supabase; desktop and terminal go through your SSH connection.
 - **One box for all bots.** A small Debian container with your host folder mounted at `/workspace`, root inside,
   Chromium + Playwright MCP so bots can browse. Install anything you like; it persists.
 - **Bots are detected, not configured.** The agent reports which CLIs are installed and logged in; the app shows it.
@@ -27,35 +27,46 @@ device you choose, using **your own subscriptions**.
 | `agent` | Device agent (Node). Pairs with your account, detects bots, runs chat turns, streams results |
 | `packages/shared` | Types shared by app and agent |
 | `supabase` | Database schema, row-level security, pairing functions (`supabase/migrations`) |
-| `docker` | The shared box image: Debian, Chromium, Claude Code, Codex, Playwright MCP, the agent |
+| `docker` | The sandbox: Debian, desktop (TigerVNC + openbox + noVNC websocket), Chromium, Claude Code, Codex, Playwright MCP, the agent |
+| `scripts/pack-box.mjs` | Packs `docker/` + the bundled agent into `dist/box`, which the app uploads to workers |
 
-## Quick start (local, everything on one machine)
+## How it works for the person
+
+1. Open the desktop app and create an account (or sign in).
+2. **Add a worker over SSH**: host, user, key or password of any machine with Docker. The app uploads the sandbox,
+   builds and starts it there, and pairs it with your account automatically.
+3. Chat with the bots on that worker. Switch to **Pulpit** to watch the sandbox's Linux desktop (the same Chromium the
+   bots drive), or to **Terminal** for a root shell inside the sandbox, e.g. to run `claude auth login` once.
+
+Supabase remembers sessions and history and shows which workers are live. SSH credentials stay on your computer
+(encrypted with the OS keychain); the desktop and terminal travel through the SSH connection, nothing is exposed.
+
+## Quick start (development)
 
 Requirements: Node 20+, Docker.
 
 ```bash
 npm install
-npm run db:start                 # local Supabase in Docker; prints API URL and anon key
+npm run db:start                 # local Supabase in Docker
 npx supabase status -o env       # API_URL / ANON_KEY
-
-# 1. the device: the shared box
-cp .env.example .env             # set A_BOT_SUPABASE_URL=http://host.docker.internal:54321 and the anon key
-docker compose up -d --build
-docker compose logs a-bot        # shows a 6-character pairing code
-
-# 2. the app
-printf 'A_BOT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321\nA_BOT_PUBLIC_SUPABASE_ANON_KEY=<anon key>\n' > apps/desktop/.env.local
-npm run dev                      # Electron; or: npm run web -w @a-bot/desktop
+printf 'A_BOT_PUBLIC_SUPABASE_URL=http://<lan-ip>:54321\nA_BOT_PUBLIC_SUPABASE_ANON_KEY=<anon key>\n' > apps/desktop/.env.local
+npm run box:pack                 # builds the agent and packs the sandbox into dist/box
+npm run dev                      # Electron app; add a worker under "Workery"
 ```
 
-Create an account in the app, enter the pairing code under **Devices**, then log the bots in once inside the box:
+Use an address for Supabase that the worker can reach too (not 127.0.0.1), or a Supabase Cloud project.
+
+### Running the sandbox by hand
 
 ```bash
-docker exec -it a-bot claude auth login           # Claude Pro/Max subscription
-docker exec -it a-bot codex login --device-auth   # ChatGPT Plus/Pro subscription
+npm run box:pack && cd dist/box
+cp ../../docker/.env.example .env   # fill in backend URL and key
+docker compose -p a-bot up -d --build
+docker logs a-bot 2>&1 | grep 'Kod parowania'   # enter the code in the app
 ```
 
-Ollama running on the host is picked up automatically (`OLLAMA_HOST=http://host.docker.internal:11434`).
+The desktop is published on the worker's loopback only (`127.0.0.1:6080`, noVNC websocket, password in
+`/root/.a-bot/vnc-password` inside the container).
 
 ## Using your own Supabase project
 
@@ -68,7 +79,7 @@ The anon key is public by design; access is enforced by row-level security in `s
 
 ## Adding another CLI bot
 
-Any CLI that takes a prompt and prints an answer can be added in `~/.a-bot/agent.json` inside the box:
+Any CLI that takes a prompt and prints an answer can be added in `~/.a-bot/agent.json` inside the sandbox:
 
 ```json
 { "customProviders": [ { "id": "aider", "name": "Aider", "command": ["aider", "--yes", "--message", "{prompt}"], "versionArgs": ["--version"] } ] }

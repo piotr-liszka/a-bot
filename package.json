@@ -11,11 +11,12 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @a-bot/desktop",
-    "build": "npm run build -w @a-bot/agent && npm run build -w @a-bot/desktop",
+    "build": "npm run box:pack && npm run build -w @a-bot/desktop",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:start": "supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,storage-api,mailpit,postgres-meta",
     "db:stop": "supabase stop",
-    "db:reset": "supabase db reset"
+    "db:reset": "supabase db reset",
+    "box:pack": "node scripts/pack-box.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
