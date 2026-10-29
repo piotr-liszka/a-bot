@@ -142,7 +142,7 @@ export function Rail(p: Props) {
                     onClick={() => p.onSelectBot(b.id)}
                     title={`${b.name}: ${working ? t('working') : state.label}`}
                   >
-                    <BotAvatar bot={{ name: b.name, kind: engine?.kind, color: b.color }} />
+                    <BotAvatar bot={{ name: b.name, kind: engine?.kind, color: b.color }} state={working ? 'work' : undefined} />
                     <span className="meta">
                       <span className="name">{b.name}</span>
                       <span className="sub">{botStatus(b, chat, working, state, engine?.name)}</span>

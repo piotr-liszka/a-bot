@@ -1,0 +1,137 @@
+/* Animated bot icons (BotIcon.tsx). Only transform and opacity move. */
+
+.avatar.avatar-icon {
+  background: none;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.bot-icon {
+  --c-dk: color-mix(in oklch, var(--c), black 32%);
+  --c-lt: color-mix(in oklch, var(--c), white 48%);
+  --glow: color-mix(in oklch, var(--c), white 84%);
+  --ink: color-mix(in oklch, var(--c), black 74%);
+  --screen: color-mix(in oklch, var(--c), oklch(0.2 0.03 264) 80%);
+  --cheek: oklch(0.8 0.11 15 / 0.75);
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.bot-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.bot-icon svg * {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes bi-blink { 0%, 91%, 97%, 100% { transform: scaleY(1); } 94% { transform: scaleY(0.1); } }
+@keyframes bi-bob { 50% { transform: translateY(-0.9px); } }
+@keyframes bi-bob-fast { 50% { transform: translateY(-0.7px); } }
+@keyframes bi-look { 0%, 100% { transform: translate(0, 0); } 18%, 42% { transform: translate(-1.6px, -1.2px); } 58%, 82% { transform: translate(1.6px, -1.2px); } }
+@keyframes bi-tilt { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes bi-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: 0.7; } }
+@keyframes bi-flash { 0% { fill: var(--signal); } 50% { fill: var(--c-lt); } }
+@keyframes bi-eq { from { transform: scaleY(0.35); } to { transform: scaleY(1.3); } }
+@keyframes bi-float { 50% { transform: translateY(-1.1px); } }
+@keyframes bi-squish { 0%, 100% { transform: scale(1, 1); } 30% { transform: scale(1.06, 0.93); } 60% { transform: scale(0.97, 1.04); } }
+@keyframes bi-dot { 0% { opacity: 0; transform: scale(0.3); } 20%, 65% { opacity: 1; transform: scale(1); } 85%, 100% { opacity: 0; transform: scale(0.6); } }
+@keyframes bi-twinkle { 0%, 100% { opacity: 0; transform: scale(0.2) rotate(0deg); } 50% { opacity: 1; transform: scale(1) rotate(45deg); } }
+@keyframes bi-breathe { 50% { transform: scale(1.035, 0.965); } }
+@keyframes bi-wobble { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes bi-hop { 0%, 100% { transform: translateY(0) scale(1.08, 0.92); } 35% { transform: translateY(-3.5px) scale(0.95, 1.06); } 55% { transform: translateY(-3.8px) scale(1, 1); } 80% { transform: translateY(0) scale(1.04, 0.97); } }
+@keyframes bi-shadow-hop { 0%, 100% { transform: scale(1); opacity: 0.2; } 50% { transform: scale(0.65); opacity: 0.08; } }
+@keyframes bi-drift { 0%, 100% { transform: translate(0, 0); } 30% { transform: translate(0.5px, 0.2px); } 65% { transform: translate(-0.5px, 0); } }
+@keyframes bi-peek { 0%, 100% { transform: translate(-0.9px, -1px); } 50% { transform: translate(0.9px, -1px); } }
+
+/* Robot */
+.bi-robot .bi-body { animation: bi-bob 3.4s ease-in-out var(--bi-d, 0s) infinite; transform-origin: 50% 100%; }
+.bi-robot .bi-blink { animation: bi-blink 4.6s var(--bi-d, 0s) infinite; }
+.bi-robot .bi-eq { opacity: 0; }
+.bi-robot .bi-eq rect { transform-origin: 50% 100%; }
+[data-state='think'] .bi-robot .bi-body { animation: bi-tilt 2.6s ease-in-out infinite; }
+[data-state='think'] .bi-robot .bi-look { animation: bi-look 2.6s ease-in-out infinite; }
+[data-state='think'] .bi-robot .bi-bulb { animation: bi-pulse 1.3s ease-in-out infinite; fill: var(--signal); }
+[data-state='work'] .bi-robot .bi-body { animation: bi-bob-fast 0.55s ease-in-out infinite; }
+[data-state='work'] .bi-robot .bi-smile { opacity: 0; }
+[data-state='work'] .bi-robot .bi-eq { opacity: 1; }
+[data-state='work'] .bi-robot .bi-eq rect { animation: bi-eq 0.42s ease-in-out infinite alternate; }
+[data-state='work'] .bi-robot .bi-eq rect:nth-child(2) { animation-delay: -0.15s; }
+[data-state='work'] .bi-robot .bi-eq rect:nth-child(3) { animation-delay: -0.3s; }
+[data-state='work'] .bi-robot .bi-bulb { animation: bi-flash 0.5s steps(1) infinite; }
+[data-state='work'] .bi-robot .bi-blink { animation: none; transform: scaleY(0.7); }
+
+/* Cloud */
+.bi-cloud .bi-puff { fill: color-mix(in oklch, var(--c), white 18%); }
+.bi-cloud .bi-body { animation: bi-float 3.8s ease-in-out var(--bi-d, 0s) infinite; transform-origin: 50% 100%; }
+.bi-cloud .bi-blink { animation: bi-blink 5s var(--bi-d, 0s) infinite; }
+.bi-cloud .bi-look { transition: transform 0.4s var(--ease); }
+.bi-cloud .bi-dots circle,
+.bi-cloud .bi-spark,
+.bi-cloud .bi-happy { opacity: 0; }
+[data-state='think'] .bi-cloud .bi-look { transform: translate(1px, -1.2px); }
+[data-state='think'] .bi-cloud .bi-dots circle { animation: bi-dot 1.8s ease-in-out infinite; }
+[data-state='think'] .bi-cloud .bi-dots circle:nth-child(2) { animation-delay: 0.25s; }
+[data-state='think'] .bi-cloud .bi-dots circle:nth-child(3) { animation-delay: 0.5s; }
+[data-state='work'] .bi-cloud .bi-body { animation: bi-squish 0.8s ease-in-out infinite; }
+[data-state='work'] .bi-cloud .bi-eyes { opacity: 0; }
+[data-state='work'] .bi-cloud .bi-happy { opacity: 1; }
+[data-state='work'] .bi-cloud .bi-spark { animation: bi-twinkle 1.2s ease-in-out infinite; }
+[data-state='work'] .bi-cloud .bi-spark:nth-of-type(2) { animation-delay: -0.4s; }
+[data-state='work'] .bi-cloud .bi-spark:nth-of-type(3) { animation-delay: -0.8s; }
+
+/* Jelly */
+.bi-blob .bi-body { animation: bi-breathe 3.2s ease-in-out var(--bi-d, 0s) infinite; transform-origin: 50% 100%; }
+.bi-blob .bi-blink { animation: bi-blink 4.2s var(--bi-d, 0s) infinite; }
+.bi-blob .bi-pupils { animation: bi-drift 6s ease-in-out var(--bi-d, 0s) infinite; }
+.bi-blob .bi-shadow { opacity: 0.2; }
+[data-state='think'] .bi-blob .bi-body { animation: bi-wobble 2.2s ease-in-out infinite; }
+[data-state='think'] .bi-blob .bi-pupils { animation: bi-peek 2.2s ease-in-out infinite; }
+[data-state='work'] .bi-blob .bi-body { animation: bi-hop 0.7s ease-in-out infinite; }
+[data-state='work'] .bi-blob .bi-shadow { animation: bi-shadow-hop 0.7s ease-in-out infinite; }
+[data-state='work'] .bi-blob .bi-pupils { animation: none; transform: translateY(0.6px); }
+
+.bot-item.unavailable .bot-icon { filter: saturate(0.4); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bot-icon svg * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Settings: icon style picker */
+.icon-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.icon-choice {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 84px;
+  padding: 12px 10px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.icon-choice:hover {
+  background: var(--panel-hover);
+}
+.icon-choice[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.icon-choice .avatar {
+  width: 40px;
+  height: 40px;
+}

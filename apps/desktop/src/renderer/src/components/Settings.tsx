@@ -6,6 +6,7 @@ import { activeBackend, isHosted } from '../lib/backend';
 import { bridge, bridgeError, type TerminalKind, type WorkerInfo } from '../lib/desktopApi';
 import { botState } from '../lib/format';
 import { BotAvatar } from './BotAvatar';
+import { BotIconPicker } from './BotIconPicker';
 import { Xterm, type XtermState } from './Xterm';
 import { lang, LANGS, setLang, t, type Lang } from '../lib/i18n';
 
@@ -215,6 +216,10 @@ export function AccountPage({ db, email, onChangeBackend }: { db: SupabaseClient
                   </option>
                 ))}
               </select>
+            </dd>
+            <dt>{t('Bot icon')}</dt>
+            <dd>
+              <BotIconPicker />
             </dd>
           </dl>
           <div className="form-actions">

@@ -7,7 +7,16 @@ import { BotAvatar } from './BotAvatar';
 import { t } from '../lib/i18n';
 
 const CUSTOM = '__custom__';
-const COLORS = ['oklch(0.62 0.135 42)', 'oklch(0.56 0.1 160)', 'oklch(0.5 0.12 250)', 'oklch(0.52 0.13 305)', 'oklch(0.58 0.14 15)', 'oklch(0.42 0.02 264)'];
+const COLORS = [
+  'oklch(0.72 0.19 45)',
+  'oklch(0.84 0.17 92)',
+  'oklch(0.8 0.2 135)',
+  'oklch(0.76 0.14 195)',
+  'oklch(0.64 0.2 258)',
+  'oklch(0.62 0.24 300)',
+  'oklch(0.7 0.22 355)',
+  'oklch(0.45 0.03 264)',
+];
 
 interface Props {
   db: SupabaseClient;
