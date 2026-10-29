@@ -6,6 +6,7 @@ import { friendlyError } from '../lib/backend';
 import { useMessages } from '../lib/data';
 import { engineState } from '../lib/format';
 import { BotAvatar } from './BotAvatar';
+import { iconState } from '../lib/botIcon';
 import { Composer } from './Composer';
 import { Message } from './Message';
 import { t } from '../lib/i18n';
@@ -119,7 +120,7 @@ export function Chat({ db, device, online, bot, engine, conversation, loading, o
   return (
     <main className="chat">
       <header className="chat-head">
-        <BotAvatar bot={avatar} />
+        <BotAvatar bot={avatar} state={running ? iconState(running) : undefined} />
         <div className="titles">
           <span className="title">{bot.name}</span>
           <span className="sub">

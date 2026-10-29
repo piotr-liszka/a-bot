@@ -5,6 +5,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { shortTime } from '../lib/format';
 import { BotAvatar, type AvatarInfo } from './BotAvatar';
+import { iconState } from '../lib/botIcon';
 import { Trace } from './Trace';
 import { t, tn } from '../lib/i18n';
 
@@ -15,7 +16,7 @@ function MessageView({ message: m, bot, online }: { message: MessageRow; bot: Av
   const seconds = m.finished_at ? Math.max(1, Math.round((Date.parse(m.finished_at) - Date.parse(m.created_at)) / 1000)) : undefined;
   return (
     <article className="msg-bot">
-      <BotAvatar bot={bot} />
+      <BotAvatar bot={bot} state={live ? iconState(m) : undefined} />
       <div className="body">
         <div className="who">
           <strong>{bot.name}</strong>
