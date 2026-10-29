@@ -26,7 +26,7 @@ export async function detectAll(providers: Map<string, Provider>): Promise<Provi
           installed: false,
           authenticated: false,
           models: [],
-          setupHint: `Wykrywanie nie powiodło się: ${String(err)}`,
+          setupHint: `Detection failed: ${String(err)}`,
         }),
       ),
     ),

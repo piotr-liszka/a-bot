@@ -51,7 +51,7 @@ after(() => {
 });
 
 test('pair a device, chat with a bot, cancel, and keep strangers out', { skip: !KEY && 'A_BOT_SUPABASE_ANON_KEY not set' }, async () => {
-  const code = await waitFor(async () => agentOut.match(/Kod parowania:\s+([A-Z0-9]{3}) ([A-Z0-9]{3})/)?.slice(1).join(''));
+  const code = await waitFor(async () => agentOut.match(/Pairing code:\s+([A-Z0-9]{3}) ([A-Z0-9]{3})/)?.slice(1).join(''));
 
   const me = client();
   await signUp(me);

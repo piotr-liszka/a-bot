@@ -14,7 +14,7 @@ export const ollamaProvider: Provider = {
       id: 'ollama',
       kind: 'ollama',
       name: 'Ollama',
-      description: 'Lokalne modele bez limitów subskrypcji. Odpowiada tekstem, bez dostępu do narzędzi.',
+      description: 'Local models without subscription limits. Answers in text, without tools.',
       installed: false,
       authenticated: false,
       models: [],
@@ -30,7 +30,7 @@ export const ollamaProvider: Provider = {
       info.defaultModel = info.models[0];
       if (info.models.length === 0) info.setupHint = 'Pobierz model, np.: ollama pull llama3.2';
     } catch {
-      info.setupHint = `Nie widzę serwera Ollama pod ${ollamaHost()}. Uruchom ollama serve albo ustaw OLLAMA_HOST.`;
+      info.setupHint = `No Ollama server at ${ollamaHost()}. Install Ollama on the worker (ollama serve) or set OLLAMA_HOST.`;
     }
     return info;
   },

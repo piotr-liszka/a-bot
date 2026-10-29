@@ -22,9 +22,9 @@ export async function ensureSignedIn(db: Db): Promise<string> {
     const { data: user, error } = await db.auth.getUser();
     if (!error && user.user) return user.user.id;
     // Keep the identity across network hiccups; only start over when the account is really gone.
-    if (error && error.status !== 401 && error.status !== 403) throw new Error(`Nie mogę połączyć się z backendem: ${error.message}`);
+    if (error && error.status !== 401 && error.status !== 403) throw new Error(`Cannot connect to the backend: ${error.message}`);
   }
   const { data: signIn, error } = await db.auth.signInAnonymously();
-  if (error || !signIn.user) throw new Error(`Logowanie agenta nie powiodło się: ${error?.message ?? 'brak użytkownika'}`);
+  if (error || !signIn.user) throw new Error(`Agent sign-in failed: ${error?.message ?? 'no user'}`);
   return signIn.user.id;
 }

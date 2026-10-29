@@ -1,4 +1,4 @@
-import type { BotRow, DeviceRow } from '@a-bot/shared';
+import type { BotRow, ConversationRow, DeviceRow } from '@a-bot/shared';
 import { isDeviceOnline } from '@a-bot/shared';
 import { ChevronsUpDown, Loader2, MessageSquare, Monitor, Plus, Settings } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -6,6 +6,7 @@ import { engineOf, engineState, relativeSeen } from '../lib/format';
 import type { WorkerUpdate } from '../lib/workers';
 import { BotAvatar } from './BotAvatar';
 import { Brand } from './GateSide';
+import { t } from '../lib/i18n';
 
 export type View = 'chat' | 'desktop' | 'bot' | 'settings';
 
@@ -18,6 +19,8 @@ interface Props {
   update?: WorkerUpdate;
   now: number;
   bots: BotRow[];
+  /** Each bot's chat, for its last message and current activity. */
+  latest: Map<string, ConversationRow>;
   botId?: string;
   /** Bot ids with a conversation in progress. */
   busyBots: Set<string>;
@@ -49,7 +52,7 @@ export function Rail(p: Props) {
   }, [menuOpen]);
 
   return (
-    <nav className="rail" aria-label="Boty i urządzenia">
+    <nav className="rail" aria-label={t('Bots and devices')}>
       <div className="rail-top">
         <Brand />
         {p.device && (
@@ -60,12 +63,12 @@ export function Rail(p: Props) {
                 <span className="name">{p.device.name}</span>
                 <span className="sub" title={p.update?.state === 'error' ? p.update.message : undefined}>
                   {p.update?.state === 'updating'
-                    ? 'Aktualizuję sandbox…'
+                    ? t('Updating the sandbox…')
                     : p.update?.state === 'error'
-                      ? 'Aktualizacja nie powiodła się'
+                      ? t('Update failed')
                       : p.online
-                        ? 'Online'
-                        : `Offline, widziany ${relativeSeen(p.device.last_seen, p.now)}`}
+                        ? t('Online')
+                        : t('Offline, seen {when}', { when: relativeSeen(p.device.last_seen, p.now) })}
                 </span>
               </span>
               <ChevronsUpDown size={14} aria-hidden />
@@ -94,18 +97,18 @@ export function Rail(p: Props) {
                     setMenuOpen(false);
                   }}
                 >
-                  <Plus size={15} aria-hidden /> Dodaj urządzenie
+                  <Plus size={15} aria-hidden /> {t('Add device')}
                 </button>
               </div>
             )}
           </div>
         )}
         {p.device && p.canUseWorker && (
-          <div className="view-tabs" role="group" aria-label="Widok urządzenia">
+          <div className="view-tabs" role="group" aria-label={t('Device view')}>
             {(
               [
-                ['chat', 'Czat', MessageSquare],
-                ['desktop', 'Pulpit', Monitor],
+                ['chat', t('Chat'), MessageSquare],
+                ['desktop', t('Desktop'), Monitor],
               ] as const
             ).map(([v, label, Icon]) => (
               <button key={v} aria-pressed={p.view === v} onClick={() => p.onSelectView(v)} title={label}>
@@ -120,8 +123,8 @@ export function Rail(p: Props) {
       {p.device && (
         <>
           <div className="rail-section">
-            <span>Boty</span>
-            <button className="rail-add" onClick={p.onNewBot} title="Nowy bot" aria-label="Nowy bot">
+            <span>{t('Bots')}</span>
+            <button className="rail-add" onClick={p.onNewBot} title={t('New bot')} aria-label={t('New bot')}>
               <Plus size={14} />
             </button>
           </div>
@@ -130,20 +133,21 @@ export function Rail(p: Props) {
               const engine = engineOf(b, p.device);
               const state = engineState(engine);
               const working = p.busyBots.has(b.id);
+              const chat = p.latest.get(b.id);
               return (
                 <li key={b.id}>
                   <button
                     className={`bot-item${state.tone === 'on' ? '' : ' unavailable'}`}
                     aria-current={p.view === 'chat' && p.botId === b.id}
                     onClick={() => p.onSelectBot(b.id)}
-                    title={`${b.name}: ${working ? 'pracuje' : state.label}`}
+                    title={`${b.name}: ${working ? t('working') : state.label}`}
                   >
                     <BotAvatar bot={{ name: b.name, kind: engine?.kind, color: b.color }} />
                     <span className="meta">
                       <span className="name">{b.name}</span>
-                      <span className="sub">{working ? 'Pracuje…' : state.tone === 'on' ? [engine?.name, b.model].filter(Boolean).join(' · ') : state.label}</span>
+                      <span className="sub">{botStatus(b, chat, working, state, engine?.name)}</span>
                     </span>
-                    {working ? <span className="working" aria-label="pracuje" /> : state.tone === 'warn' ? <span className="dot warn" aria-hidden /> : null}
+                    {working ? <span className="working" aria-label={t('working')} /> : state.tone === 'warn' ? <span className="dot warn" aria-hidden /> : null}
                   </button>
                 </li>
               );
@@ -155,7 +159,7 @@ export function Rail(p: Props) {
                     <Plus size={15} />
                   </span>
                   <span className="meta">
-                    <span className="name">Stwórz bota</span>
+                    <span className="name">{t('Create a bot')}</span>
                   </span>
                 </button>
               </li>
@@ -167,9 +171,16 @@ export function Rail(p: Props) {
       <div className="rail-bottom">
         <button className="rail-link" aria-current={p.view === 'settings'} onClick={p.onOpenSettings} title={p.email}>
           <Settings size={16} aria-hidden />
-          <span className="grow">Ustawienia</span>
+          <span className="grow">{t('Settings')}</span>
         </button>
       </div>
     </nav>
   );
+}
+
+/** Under the bot's name: what it is doing now, else its last message, else what it runs on. */
+function botStatus(bot: BotRow, chat: ConversationRow | undefined, working: boolean, state: { label: string; tone: string }, engineName?: string): string {
+  if (working) return chat?.activity ?? t('Working…');
+  if (state.tone !== 'on') return state.label;
+  return chat?.last_message_preview ?? ([engineName, bot.model].filter(Boolean).join(' · ') || t('Ready'));
 }

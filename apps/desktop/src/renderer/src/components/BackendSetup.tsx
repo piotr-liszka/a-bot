@@ -2,6 +2,7 @@ import type { BackendConfig } from '@a-bot/shared';
 import { useState, type FormEvent } from 'react';
 import { hostedBackend, probeBackend } from '../lib/backend';
 import { GateSide } from './GateSide';
+import { t } from '../lib/i18n';
 
 export function BackendSetup({ initial, onDone, onCancel }: { initial?: BackendConfig; onDone: (cfg: BackendConfig) => void; onCancel?: () => void }) {
   const hosted = hostedBackend();
@@ -13,7 +14,7 @@ export function BackendSetup({ initial, onDone, onCancel }: { initial?: BackendC
   async function submit(e: FormEvent) {
     e.preventDefault();
     const cfg = { url: url.trim().replace(/\/$/, ''), anonKey: anonKey.trim() };
-    if (!/^https?:\/\//.test(cfg.url)) return setError('Adres musi zaczynać się od https:// (albo http:// dla lokalnego serwera).');
+    if (!/^https?:\/\//.test(cfg.url)) return setError(t('The address must start with https:// (or http:// for a local server).'));
     setBusy(true);
     setError(undefined);
     const problem = await probeBackend(cfg);
@@ -27,25 +28,25 @@ export function BackendSetup({ initial, onDone, onCancel }: { initial?: BackendC
       <GateSide />
       <main className="gate-main">
         <form className="gate-card" onSubmit={submit}>
-          <h1>Połącz z serwerem a-bot</h1>
-          <p className="lede">Serwer przechowuje historię rozmów i łączy aplikację z Twoimi urządzeniami.</p>
+          <h1>{t('Connect to an a-bot server')}</h1>
+          <p className="lede">{t('The server keeps your chat history and connects the app with your devices.')}</p>
           {hosted && (
             <>
               <button type="button" className="btn btn-primary" onClick={() => onDone(hosted)}>
-                Użyj konta a-bot
+                {t('Use an a-bot account')}
               </button>
-              <p className="hint">Albo podaj własny serwer Supabase:</p>
+              <p className="hint">{t('Or use your own Supabase server:')}</p>
             </>
           )}
           <label className="field">
-            <span>Adres serwera</span>
-            <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://twoj-projekt.supabase.co" autoFocus={!hosted} required />
+            <span>{t('Server address')}</span>
+            <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://your-project.supabase.co" autoFocus={!hosted} required />
           </label>
           <label className="field">
-            <span>Klucz publiczny</span>
-            <input className="input" value={anonKey} onChange={(e) => setAnonKey(e.target.value)} placeholder="sb_publishable_… albo klucz anon" required />
+            <span>{t('Public key')}</span>
+            <input className="input" value={anonKey} onChange={(e) => setAnonKey(e.target.value)} placeholder={t('sb_publishable_… or the anon key')} required />
           </label>
-          <p className="hint">Znajdziesz je w Supabase w Project Settings → API. Ten klucz jest publiczny, dostęp chronią reguły bazy.</p>
+          <p className="hint">{t('Find both in Supabase under Project Settings → API. The key is public; database rules protect access.')}</p>
           {error && (
             <p className="form-error" role="alert">
               {error}
@@ -53,11 +54,11 @@ export function BackendSetup({ initial, onDone, onCancel }: { initial?: BackendC
           )}
           <div style={{ display: 'flex', gap: 8 }}>
             <button className={hosted ? 'btn' : 'btn btn-primary'} disabled={busy}>
-              {busy ? 'Sprawdzam…' : 'Połącz'}
+              {busy ? t('Checking…') : t('Connect')}
             </button>
             {onCancel && (
               <button type="button" className="btn btn-ghost" onClick={onCancel}>
-                Anuluj
+                {t('Cancel')}
               </button>
             )}
           </div>

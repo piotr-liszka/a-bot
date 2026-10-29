@@ -1,4 +1,5 @@
 import { Check, Bot } from 'lucide-react';
+import { t } from '../lib/i18n';
 
 export function Brand() {
   return (
@@ -15,19 +16,19 @@ export function GateSide() {
   return (
     <aside className="gate-side">
       <Brand />
-      <p>Rozmawiaj z Claude, Codex i lokalnymi modelami, które pracują na Twoim własnym serwerze, we wspólnym linuksowym środowisku.</p>
+      <p>{t('Your own AI bots, running on your own machine in a shared Linux box with a desktop and a browser.')}</p>
       <ul className="gate-points">
         <li>
           <Check size={16} />
-          <span>Twoje subskrypcje, Twoje urządzenie. Aplikacja tylko przekazuje rozmowę.</span>
+          <span>{t('Your subscriptions, your device. The app only relays the conversation.')}</span>
         </li>
         <li>
           <Check size={16} />
-          <span>Jeden kontener dla wszystkich botów, z Twoim katalogiem pod /workspace i przeglądarką.</span>
+          <span>{t('One container for all bots, with your folder at /workspace and a browser.')}</span>
         </li>
         <li>
           <Check size={16} />
-          <span>Open source. Używaj hostowanego konta albo postaw wszystko u siebie.</span>
+          <span>{t('Open source. Use the hosted account or run everything yourself.')}</span>
         </li>
       </ul>
     </aside>

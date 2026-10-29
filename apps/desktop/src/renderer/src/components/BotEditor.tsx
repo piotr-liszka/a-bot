@@ -4,7 +4,9 @@ import { useState, type FormEvent } from 'react';
 import { friendlyError } from '../lib/backend';
 import { botHue, botState } from '../lib/format';
 import { BotAvatar } from './BotAvatar';
+import { t } from '../lib/i18n';
 
+const CUSTOM = '__custom__';
 const COLORS = ['oklch(0.62 0.135 42)', 'oklch(0.56 0.1 160)', 'oklch(0.5 0.12 250)', 'oklch(0.52 0.13 305)', 'oklch(0.58 0.14 15)', 'oklch(0.42 0.02 264)'];
 
 interface Props {
@@ -14,7 +16,7 @@ interface Props {
   /** The person has no bots yet on this device. */
   first?: boolean;
   onSaved: (bot: BotRow) => void;
-  onDeleted?: () => void;
+  onDeleted?: (id: string) => void;
   onCancel?: () => void;
   onOpenAccounts: () => void;
 }
@@ -25,6 +27,7 @@ export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel
   const [name, setName] = useState(bot?.name ?? '');
   const [engineId, setEngineId] = useState(bot?.engine ?? firstReady?.id ?? '');
   const [model, setModel] = useState(bot?.model ?? '');
+  const [customModel, setCustomModel] = useState(false);
   const [instructions, setInstructions] = useState(bot?.instructions ?? '');
   const [color, setColor] = useState<string | null>(bot?.color ?? null);
   const [busy, setBusy] = useState(false);
@@ -32,6 +35,8 @@ export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const engine = engines.find((p) => p.id === engineId);
+  // A saved model the engine no longer lists (or never did) is edited as free text.
+  const showCustom = customModel || Boolean(model && engine && !engine.models.includes(model));
   const state = engine ? botState(engine) : undefined;
 
   async function save(e: FormEvent) {
@@ -61,7 +66,7 @@ export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel
     const { error } = await db.from('bots').delete().eq('id', bot.id);
     setBusy(false);
     if (error) return setError(friendlyError(error));
-    onDeleted?.();
+    onDeleted?.(bot.id);
   }
 
   return (
@@ -70,26 +75,29 @@ export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel
         <div className="page-inner" style={{ maxWidth: 640 }}>
           <div className="page-head">
             <BotAvatar bot={{ name: name || '?', kind: engine?.kind, color }} size="lg" />
-            <h1>{bot ? `Edytuj bota „${bot.name}”` : first ? 'Stwórz pierwszego bota' : 'Nowy bot'}</h1>
+            <h1>{bot ? t('Edit “{bot}”', { bot: bot.name }) : first ? t('Create your first bot') : t('New bot')}</h1>
           </div>
           {!bot && (
             <p className="page-lede">
-              Bot to Twój asystent z nazwą i instrukcjami. Działa na jednym z silników wykrytych na „{device.name}” (Claude Code, Codex, Ollama…) i ma dostęp do
-              sandboxa: terminala, przeglądarki i <code>/workspace</code>.
+              {t('A bot is your assistant with a name and instructions. It runs on one of the engines found on “{device}” (Claude Code, Codex, Ollama…) and can use the sandbox: terminal, browser and /workspace.', { device: device.name })}
             </p>
           )}
           {engines.length === 0 ? (
-            <p className="page-lede">Agent na „{device.name}” jeszcze nie przysłał listy silników (claude, codex, ollama…). Upewnij się, że sandbox działa.</p>
+            <p className="page-lede">{t('The agent on “{device}” has not reported its engines yet (claude, codex, ollama…). Make sure the sandbox is running.', { device: device.name })}</p>
           ) : (
             <form className="bot-form" onSubmit={save}>
               <label className="field">
-                <span>Nazwa</span>
-                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="np. Researcher, Devops, Asystent" maxLength={60} required autoFocus={!bot} />
+                <span>{t('Name')}</span>
+                <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('e.g. Researcher, Devops, Assistant')} maxLength={60} required autoFocus={!bot} />
               </label>
               <div className="worker-grid">
                 <label className="field">
-                  <span>Silnik</span>
-                  <select className="input" value={engineId} onChange={(e) => setEngineId(e.target.value)}>
+                  <span>{t('Engine')}</span>
+                  <select className="input" value={engineId} onChange={(e) => {
+                      setEngineId(e.target.value);
+                      setModel('');
+                      setCustomModel(false);
+                    }}>
                     {engines.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -99,47 +107,59 @@ export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel
                   </select>
                 </label>
                 <label className="field">
-                  <span>Model (opcjonalnie)</span>
-                  <input
+                  <span>{t('Model')}</span>
+                  <select
                     className="input"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    list="bot-models"
-                    placeholder={engine?.defaultModel ? `domyślny: ${engine.defaultModel}` : 'domyślny'}
-                    spellCheck={false}
-                  />
-                  <datalist id="bot-models">
-                    {engine?.models.map((m) => <option key={m} value={m} />)}
-                  </datalist>
+                    value={showCustom ? CUSTOM : model}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setCustomModel(v === CUSTOM);
+                      setModel(v === CUSTOM ? '' : v);
+                    }}
+                  >
+                    <option value="">{engine?.defaultModel ? t('Default ({model})', { model: engine.defaultModel }) : t('Default')}</option>
+                    {engine?.models.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                    <option value={CUSTOM}>{t('Other…')}</option>
+                  </select>
                 </label>
+                {showCustom && (
+                  <label className="field span-2">
+                    <span>{t('Model name')}</span>
+                    <input className="input" value={model} onChange={(e) => setModel(e.target.value)} placeholder={t('e.g. claude-opus-4-1 or qwen3.5:9b')} spellCheck={false} autoFocus />
+                  </label>
+                )}
               </div>
               {state && state.tone !== 'on' && (
                 <p className="hint">
-                  {engine!.name}: {state.label.toLowerCase()} na „{device.name}”.{' '}
+                  {t('{engine}: {state} on “{device}”.', { engine: engine!.name, state: state.label.toLowerCase(), device: device.name })}{' '}
                   {engine!.kind === 'claude' || engine!.kind === 'codex' ? (
                     <button type="button" className="link-btn" onClick={onOpenAccounts}>
-                      Zaloguj w Ustawieniach
+                      {t('Sign in under Settings')}
                     </button>
                   ) : (
-                    engine!.setupHint
+                    engine!.setupHint && t(engine!.setupHint)
                   )}
                 </p>
               )}
               <label className="field">
-                <span>Instrukcje (opcjonalnie)</span>
+                <span>{t('Instructions (optional)')}</span>
                 <textarea
                   className="input textarea"
                   rows={6}
                   value={instructions}
                   onChange={(e) => setInstructions(e.target.value)}
                   maxLength={8000}
-                  placeholder="Kim jest ten bot i jak ma pracować, np. „Odpowiadaj po polsku, zwięźle. Przed zmianami w /workspace zrób commit.”"
+                  placeholder={t('Who this bot is and how it should work, e.g. “Answer briefly. Commit before changing files in /workspace.”')}
                 />
               </label>
               <div className="field">
-                <span>Kolor</span>
-                <div className="swatches" role="radiogroup" aria-label="Kolor">
-                  <button type="button" role="radio" aria-checked={color === null} className="swatch" style={{ background: botHue(engine?.kind ?? 'custom') }} onClick={() => setColor(null)} title="Kolor silnika" />
+                <span>{t('Color')}</span>
+                <div className="swatches" role="radiogroup" aria-label={t('Color')}>
+                  <button type="button" role="radio" aria-checked={color === null} className="swatch" style={{ background: botHue(engine?.kind ?? 'custom') }} onClick={() => setColor(null)} title={t('Engine color')} />
                   {COLORS.map((c) => (
                     <button key={c} type="button" role="radio" aria-checked={color === c} className="swatch" style={{ background: c }} onClick={() => setColor(c)} />
                   ))}
@@ -152,26 +172,26 @@ export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel
               )}
               <div className="form-actions">
                 <button className="btn btn-primary" disabled={busy || !name.trim() || !engineId}>
-                  {bot ? 'Zapisz' : 'Stwórz bota'}
+                  {bot ? t('Save') : t('Create bot')}
                 </button>
                 {onCancel && (
                   <button type="button" className="btn btn-ghost" onClick={onCancel}>
-                    Anuluj
+                    {t('Cancel')}
                   </button>
                 )}
                 {bot &&
                   (confirmDelete ? (
                     <span className="push-right">
                       <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>
-                        Usuń bota i jego rozmowy
+                        {t('Delete the bot and its chat')}
                       </button>
                       <button type="button" className="btn btn-ghost" onClick={() => setConfirmDelete(false)}>
-                        Nie
+                        {t('No')}
                       </button>
                     </span>
                   ) : (
                     <button type="button" className="btn btn-ghost push-right" onClick={() => setConfirmDelete(true)}>
-                      Usuń bota
+                      {t('Delete bot')}
                     </button>
                   ))}
               </div>

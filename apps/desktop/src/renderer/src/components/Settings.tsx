@@ -7,29 +7,30 @@ import { bridge, bridgeError, type TerminalKind, type WorkerInfo } from '../lib/
 import { botState } from '../lib/format';
 import { BotAvatar } from './BotAvatar';
 import { Xterm, type XtermState } from './Xterm';
+import { lang, LANGS, setLang, t, type Lang } from '../lib/i18n';
 
 export type SettingsSection = 'devices' | 'accounts' | 'terminal' | 'account';
 
 const SECTIONS: { id: SettingsSection; label: string; Icon: typeof Server; desktopOnly?: boolean }[] = [
-  { id: 'devices', label: 'Urządzenia', Icon: Server },
-  { id: 'accounts', label: 'Konta modeli', Icon: KeyRound },
+  { id: 'devices', label: 'Devices', Icon: Server },
+  { id: 'accounts', label: 'Model accounts', Icon: KeyRound },
   { id: 'terminal', label: 'Terminal', Icon: SquareTerminal, desktopOnly: true },
-  { id: 'account', label: 'Konto', Icon: UserRound },
+  { id: 'account', label: 'Account', Icon: UserRound },
 ];
 
 export function SettingsNav({ section, onSelect }: { section: SettingsSection; onSelect: (s: SettingsSection) => void }) {
   const desktop = Boolean(bridge());
   return (
-    <aside className="list" aria-label="Ustawienia">
+    <aside className="list" aria-label={t('Settings')}>
       <div className="list-head">
         <div className="list-title">
-          <h2>Ustawienia</h2>
+          <h2>{t('Settings')}</h2>
         </div>
       </div>
       <nav className="settings-nav">
         {SECTIONS.filter((s) => desktop || !s.desktopOnly).map(({ id, label, Icon }) => (
           <button key={id} className="settings-link" aria-current={section === id} onClick={() => onSelect(id)}>
-            <Icon size={15} aria-hidden /> {label}
+            <Icon size={15} aria-hidden /> {t(label)}
           </button>
         ))}
       </nav>
@@ -39,8 +40,8 @@ export function SettingsNav({ section, onSelect }: { section: SettingsSection; o
 
 /** Engines that can log in from the app, and the terminal command each one runs. */
 const LOGIN: Partial<Record<ProviderInfo['kind'], { terminal: TerminalKind; logout: 'claude-logout' | 'codex-logout'; note: string }>> = {
-  claude: { terminal: 'claude-login', logout: 'claude-logout', note: 'Otworzy się link do logowania. Po zalogowaniu wklej kod z przeglądarki tutaj i naciśnij Enter.' },
-  codex: { terminal: 'codex-login', logout: 'codex-logout', note: 'Otwórz link, wpisz pokazany kod i potwierdź logowanie w przeglądarce.' },
+  claude: { terminal: 'claude-login', logout: 'claude-logout', note: 'A sign-in link opens. After signing in, paste the code from the browser here and press Enter.' },
+  codex: { terminal: 'codex-login', logout: 'codex-logout', note: 'Open the link, enter the code shown and confirm in the browser.' },
 };
 
 export function AccountsPage({ db, devices, now, workers, onOpenDevices }: { db: SupabaseClient; devices: DeviceRow[]; now: number; workers: WorkerInfo[]; onOpenDevices: () => void }) {
@@ -49,17 +50,16 @@ export function AccountsPage({ db, devices, now, workers, onOpenDevices }: { db:
       <div className="page">
         <div className="page-inner">
           <div>
-            <h1>Konta modeli</h1>
+            <h1>{t('Model accounts')}</h1>
             <p className="page-lede">
-              Silniki, na których działają Twoje boty. Logowanie zostaje w sandboxie na workerze, więc robisz je raz na urządzenie. Ollama i własne CLI nie wymagają
-              logowania.
+              {t('The engines your bots run on. Sign-ins stay in the sandbox on the worker, so you do this once per device. Ollama and custom CLIs need no sign-in.')}
             </p>
           </div>
           {devices.length === 0 && (
             <p className="hint">
-              Nie masz jeszcze urządzeń.{' '}
+              {t('You have no devices yet.')}{' '}
               <button className="link-btn" onClick={onOpenDevices}>
-                Dodaj workera
+                {t('Add a worker')}
               </button>
             </p>
           )}
@@ -89,7 +89,7 @@ function DeviceAccounts({ db, device, online, worker, onOpenDevices }: { db: Sup
     setMessage(undefined);
     try {
       await bridge()!.workers.exec(worker.id, spec.logout);
-      setMessage(`${engine.name}: wylogowano.`);
+      setMessage(t('{engine}: signed out.', { engine: engine.name }));
     } catch (err) {
       setMessage(bridgeError(err));
     }
@@ -102,15 +102,15 @@ function DeviceAccounts({ db, device, online, worker, onOpenDevices }: { db: Sup
         <span className={`dot ${online ? 'on' : 'off'}`} aria-hidden />
         <div className="meta">
           <div className="name">{device.name}</div>
-          <div className="sub">{online ? 'Online' : 'Offline: stan logowania może być nieaktualny'}</div>
+          <div className="sub">{online ? t('Online') : t('Offline: sign-in state may be out of date')}</div>
         </div>
         <button className="btn btn-sm" onClick={refresh} disabled={!online || refreshing}>
-          <RefreshCw size={14} aria-hidden className={refreshing ? 'spin' : undefined} /> Sprawdź ponownie
+          <RefreshCw size={14} aria-hidden className={refreshing ? 'spin' : undefined} /> {t('Check again')}
         </button>
       </div>
       {device.providers.length === 0 ? (
         <p className="hint" style={{ padding: '0 16px 14px' }}>
-          Agent jeszcze nie przysłał listy silników.
+          {t('The agent has not reported its engines yet.')}
         </p>
       ) : (
         <ul className="engine-list">
@@ -126,9 +126,9 @@ function DeviceAccounts({ db, device, online, worker, onOpenDevices }: { db: Sup
                     {p.version && <span className="tabular version"> {p.version}</span>}
                   </span>
                   <span className="state">
-                    <span className={`dot ${s.tone}`} aria-hidden /> {s.tone === 'on' && spec ? 'Zalogowano' : s.label}
+                    <span className={`dot ${s.tone}`} aria-hidden /> {s.tone === 'on' && spec ? t('Signed in') : s.label}
                   </span>
-                  {!spec && s.tone !== 'on' && p.setupHint && <span className="setup-hint">{p.setupHint}</span>}
+                  {!spec && s.tone !== 'on' && p.setupHint && <span className="setup-hint">{t(p.setupHint)}</span>}
                 </div>
                 {spec && p.installed && worker && (
                   <div className="actions">
@@ -137,11 +137,11 @@ function DeviceAccounts({ db, device, online, worker, onOpenDevices }: { db: Sup
                       disabled={!online || login?.engine === p.id}
                       onClick={() => setLogin({ engine: p.id, kind: spec.terminal, note: spec.note, state: { kind: 'connecting' } })}
                     >
-                      {s.tone === 'on' ? 'Zaloguj ponownie' : 'Zaloguj'}
+                      {s.tone === 'on' ? t('Sign in again') : t('Sign in')}
                     </button>
                     {s.tone === 'on' && (
                       <button className="btn btn-sm btn-ghost" disabled={!online} onClick={() => logout(p)}>
-                        Wyloguj
+                        {t('Sign out')}
                       </button>
                     )}
                   </div>
@@ -153,22 +153,22 @@ function DeviceAccounts({ db, device, online, worker, onOpenDevices }: { db: Sup
       )}
       {!worker && bridge() && device.providers.some((p) => LOGIN[p.kind]) && (
         <p className="hint device-note">
-          Logowanie z aplikacji wymaga dostępu SSH do tego urządzenia.{' '}
+          {t('Signing in from the app needs SSH access to this device.')}{' '}
           <button className="link-btn" onClick={onOpenDevices}>
-            Połącz przez SSH w Urządzeniach
+            {t('Connect over SSH in Devices')}
           </button>
         </p>
       )}
-      {!bridge() && <p className="hint device-note">Logowanie silników jest dostępne w aplikacji desktopowej.</p>}
+      {!bridge() && <p className="hint device-note">{t('Engine sign-in is available in the desktop app.')}</p>}
       {message && <p className="hint device-note">{message}</p>}
       {login && worker && (
         <div className="login-term">
           <div className="login-term-head">
-            <span className="grow">{login.state.kind === 'closed' ? 'Logowanie zakończone. Sprawdzam stan…' : login.note}</span>
+            <span className="grow">{login.state.kind === 'closed' ? t('Sign-in finished. Checking…') : t(login.note)}</span>
             <button
               className="icon-btn"
-              aria-label="Zamknij"
-              title="Zamknij"
+              aria-label={t('Close')}
+              title={t('Close')}
               onClick={() => {
                 setLogin(undefined);
                 refresh();
@@ -200,19 +200,29 @@ export function AccountPage({ db, email, onChangeBackend }: { db: SupabaseClient
     <main className="chat">
       <div className="page">
         <div className="page-inner" style={{ maxWidth: 640 }}>
-          <h1>Konto</h1>
+          <h1>{t('Account')}</h1>
           <dl className="facts">
-            <dt>E-mail</dt>
+            <dt>{t('Email')}</dt>
             <dd>{email}</dd>
-            <dt>Serwer</dt>
-            <dd>{backend ? (isHosted(backend) ? 'a-bot (hostowany)' : backend.url) : '—'}</dd>
+            <dt>{t('Server')}</dt>
+            <dd>{backend ? (isHosted(backend) ? t('a-bot (hosted)') : backend.url) : '—'}</dd>
+            <dt>{t('Language')}</dt>
+            <dd>
+              <select className="input select-inline" value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t('Language')}>
+                {LANGS.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </dd>
           </dl>
           <div className="form-actions">
             <button className="btn" onClick={() => db.auth.signOut()}>
-              <LogOut size={14} aria-hidden /> Wyloguj
+              <LogOut size={14} aria-hidden /> {t('Sign out')}
             </button>
             <button className="btn btn-ghost" onClick={onChangeBackend}>
-              Zmień serwer
+              {t('Change server')}
             </button>
           </div>
         </div>

@@ -27,12 +27,12 @@ export class JobRunner {
   async recoverInterrupted(): Promise<void> {
     const { data } = await this.db
       .from('messages')
-      .update({ status: 'error', error: 'Agent został zrestartowany w trakcie odpowiedzi.', finished_at: new Date().toISOString() })
+      .update({ status: 'error', error: 'The agent restarted while answering.', finished_at: new Date().toISOString() })
       .eq('device_id', this.deviceId)
       .eq('status', 'streaming')
       .select('conversation_id');
     for (const row of data ?? []) {
-      await this.db.from('conversations').update({ busy: false }).eq('id', row.conversation_id);
+      await this.db.from('conversations').update({ busy: false, activity: null }).eq('id', row.conversation_id);
     }
   }
 
@@ -44,7 +44,7 @@ export class JobRunner {
       .eq('role', 'assistant')
       .eq('status', 'pending')
       .order('created_at');
-    if (error) throw new Error(`Nie mogę pobrać zadań: ${error.message}`);
+    if (error) throw new Error(`Cannot fetch jobs: ${error.message}`);
     for (const m of (data ?? []) as MessageRow[]) this.enqueue(m);
   }
 
@@ -58,7 +58,7 @@ export class JobRunner {
   cancel(messageId: string): void {
     const ctl = this.running.get(messageId);
     if (ctl) {
-      log.info(`anulowanie ${messageId}`);
+      log.info(`cancelling ${messageId}`);
       ctl.abort();
     } else {
       this.queue = this.queue.filter((m) => m.id !== messageId);
@@ -78,7 +78,7 @@ export class JobRunner {
       this.running.set(next.id, ctl);
       this.busyConversations.add(next.conversation_id);
       this.execute(next, ctl)
-        .catch((err) => log.error(`zadanie ${next.id}: ${String(err)}`))
+        .catch((err) => log.error(`job ${next.id}: ${String(err)}`))
         .finally(() => {
           this.running.delete(next.id);
           this.busyConversations.delete(next.conversation_id);
@@ -115,12 +115,19 @@ export class JobRunner {
     let usage: MessageUsage | null = null;
     let sessionId = conv.provider_session_id ?? undefined;
     let dirty = false;
+    let activity: string | null = null;
     let flushing: Promise<unknown> = Promise.resolve();
     const flush = () => {
       if (!dirty) return flushing;
       dirty = false;
       const patch = { text, steps };
-      flushing = flushing.then(() => this.db.from('messages').update(patch).eq('id', message.id));
+      const current = [...steps].reverse().find((s) => s.status === 'running' && s.kind !== 'thinking')?.title ?? null;
+      const activityChanged = current !== activity;
+      activity = current;
+      flushing = flushing.then(async () => {
+        await this.db.from('messages').update(patch).eq('id', message.id);
+        if (activityChanged) await this.db.from('conversations').update({ activity: current }).eq('id', conv.id);
+      });
       return flushing;
     };
     const timer = setInterval(flush, FLUSH_MS);
@@ -132,12 +139,12 @@ export class JobRunner {
     }
     const provider = this.providers().get(conv.provider_id);
     const model = message.model ?? conv.model ?? bot?.model ?? undefined;
-    log.info(`→ ${conv.provider_id}${model ? `/${model}` : ''} w „${conv.title}”`);
+    log.info(`→ ${conv.provider_id}${model ? `/${model}` : ''} in "${conv.title}"`);
     let status: MessageRow['status'] = 'done';
     let errorText: string | null = null;
     try {
-      if (!provider) throw new ProviderError(`Silnik „${conv.provider_id}” nie jest dostępny na tym urządzeniu.`);
-      if (!lastUser) throw new ProviderError('Brak wiadomości, na którą można odpowiedzieć.');
+      if (!provider) throw new ProviderError(`Engine "${conv.provider_id}" is not available on this device.`);
+      if (!lastUser) throw new ProviderError('There is no message to answer.');
       await provider.run({
         prompt: lastUser.text,
         history,
@@ -170,7 +177,7 @@ export class JobRunner {
       } else {
         status = 'error';
         errorText = err instanceof Error ? err.message : String(err);
-        log.warn(`błąd: ${errorText}`);
+        log.warn(`error: ${errorText}`);
       }
     } finally {
       clearInterval(timer);
@@ -181,11 +188,11 @@ export class JobRunner {
       .from('messages')
       .update({ text, steps, usage, status, error: errorText, finished_at: new Date().toISOString() })
       .eq('id', message.id);
-    const preview = (text || errorText || '').replace(/`{3}\w*/g, '').replace(/[`*_#>|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    const preview = (text || errorText || '').replace(/^\s*\|?[\s:|-]+\|?\s*$/gm, '').replace(/`{3}\w*/g, '').replace(/[`*_#>|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120);
     await this.db
       .from('conversations')
-      .update({ busy: false, provider_session_id: sessionId ?? null, updated_at: new Date().toISOString(), ...(preview ? { last_message_preview: preview } : {}) })
+      .update({ busy: false, activity: null, provider_session_id: sessionId ?? null, updated_at: new Date().toISOString(), ...(preview ? { last_message_preview: preview } : {}) })
       .eq('id', conv.id);
-    log.info(`✓ ${status} (${text.length} znaków, ${steps.length} kroków)`);
+    log.info(`✓ ${status} (${text.length} chars, ${steps.length} steps)`);
   }
 }

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { useState, type FormEvent } from 'react';
 import { friendlyError, isHosted } from '../lib/backend';
 import { GateSide } from './GateSide';
+import { t } from '../lib/i18n';
 
 export function AuthScreen({ db, backend, onChangeBackend }: { db: SupabaseClient; backend: BackendConfig; onChangeBackend: () => void }) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -23,7 +24,7 @@ export function AuthScreen({ db, backend, onChangeBackend }: { db: SupabaseClien
     } else {
       const { data, error } = await db.auth.signUp({ email, password });
       if (error) setError(friendlyError(error));
-      else if (!data.session) setInfo('Wysłaliśmy link potwierdzający. Kliknij go, a potem zaloguj się tutaj.');
+      else if (!data.session) setInfo(t('We sent you a confirmation link. Click it, then sign in here.'));
     }
     setBusy(false);
   }
@@ -34,19 +35,19 @@ export function AuthScreen({ db, backend, onChangeBackend }: { db: SupabaseClien
       <GateSide />
       <main className="gate-main">
         <form className="gate-card" onSubmit={submit}>
-          <h1>{mode === 'signin' ? 'Zaloguj się' : 'Załóż konto'}</h1>
+          <h1>{mode === 'signin' ? t('Sign in') : t('Create account')}</h1>
           <p className="lede">
-            Serwer: {isHosted(backend) ? 'konto a-bot' : host}.{' '}
+            {t('Server')}: {isHosted(backend) ? t('a-bot account') : host}.{' '}
             <button type="button" className="btn-link" onClick={onChangeBackend} style={{ border: 0, background: 'none', padding: 0, color: 'var(--accent)' }}>
-              Zmień
+              {t('Change')}
             </button>
           </p>
           <label className="field">
-            <span>E-mail</span>
+            <span>{t('Email')}</span>
             <input className="input" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus />
           </label>
           <label className="field">
-            <span>Hasło</span>
+            <span>{t('Password')}</span>
             <input
               className="input"
               type="password"
@@ -64,12 +65,12 @@ export function AuthScreen({ db, backend, onChangeBackend }: { db: SupabaseClien
           )}
           {info && <p className="hint">{info}</p>}
           <button className="btn btn-primary" disabled={busy}>
-            {busy ? 'Chwileczkę…' : mode === 'signin' ? 'Zaloguj się' : 'Załóż konto'}
+            {busy ? t('One moment…') : mode === 'signin' ? t('Sign in') : t('Create account')}
           </button>
           <p className="gate-switch">
-            {mode === 'signin' ? 'Pierwszy raz tutaj? ' : 'Masz już konto? '}
+            {mode === 'signin' ? t('New here?') : t('Already have an account?')}{' '}
             <button type="button" onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}>
-              {mode === 'signin' ? 'Załóż konto' : 'Zaloguj się'}
+              {mode === 'signin' ? t('Create account') : t('Sign in')}
             </button>
           </p>
         </form>

@@ -1,6 +1,6 @@
 import type { BotRow, ConversationRow, DeviceRow, MessageRow, ProviderInfo } from '@a-bot/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Eraser, Pencil } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { friendlyError } from '../lib/backend';
 import { useMessages } from '../lib/data';
@@ -8,6 +8,7 @@ import { engineState } from '../lib/format';
 import { BotAvatar } from './BotAvatar';
 import { Composer } from './Composer';
 import { Message } from './Message';
+import { t } from '../lib/i18n';
 
 interface Props {
   db: SupabaseClient;
@@ -16,18 +17,20 @@ interface Props {
   bot: BotRow;
   /** The engine the bot runs on, as the device reports it. */
   engine?: ProviderInfo;
+  /** The bot's one chat; undefined until the first message or after clearing. */
   conversation?: ConversationRow;
-  onCreated: (id: string) => void;
-  onDeleted: () => void;
+  loading: boolean;
+  onCleared: (conversationId: string) => void;
   onEditBot: () => void;
   onOpenAccounts: () => void;
 }
 
-const SUGGESTIONS = ['Co jest w /workspace?', 'Otwórz przeglądarkę i sprawdź pogodę w Krakowie', 'Zainstaluj ffmpeg i pokaż wersję'];
+const SUGGESTIONS = ['What is in /workspace?', 'Open the browser and check the weather in Kraków', 'Install ffmpeg and show its version'];
 
-export function Chat({ db, device, online, bot, engine, conversation, onCreated, onDeleted, onEditBot, onOpenAccounts }: Props) {
+export function Chat({ db, device, online, bot, engine, conversation, loading, onCleared, onEditBot, onOpenAccounts }: Props) {
   const messages = useMessages(db, conversation?.id);
   const [sendError, setSendError] = useState<string>();
+  const [confirmClear, setConfirmClear] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
 
@@ -73,7 +76,6 @@ export function Chat({ db, device, online, bot, engine, conversation, onCreated,
       setSendError(friendlyError(error));
       return false;
     }
-    if (!conversation) onCreated(conversationId);
     return true;
   }
 
@@ -87,24 +89,31 @@ export function Chat({ db, device, online, bot, engine, conversation, onCreated,
     }
   }
 
-  async function remove() {
+  /** Starts over: drops this chat (the bot's memory stays) and the next message opens a new one. */
+  async function clear() {
     if (!conversation) return;
-    await db.from('conversations').delete().eq('id', conversation.id);
-    onDeleted();
+    setConfirmClear(false);
+    const { error } = await db.from('conversations').delete().eq('id', conversation.id);
+    if (error) setSendError(friendlyError(error));
+    else onCleared(conversation.id);
   }
 
   const blocked =
     state.tone !== 'on'
       ? {
           text: engine
-            ? `${bot.name} działa na ${engine.name}, który ${state.tone === 'warn' ? 'wymaga logowania' : 'nie jest zainstalowany'} na „${device.name}”.`
-            : `Silnik „${bot.engine}” nie jest dostępny na „${device.name}”.`,
-          hint: engine && (engine.kind === 'claude' || engine.kind === 'codex') ? undefined : engine?.setupHint,
-          action: engine?.kind === 'claude' || engine?.kind === 'codex' ? { label: 'Zaloguj w Ustawieniach', onClick: onOpenAccounts } : { label: 'Edytuj bota', onClick: onEditBot },
+            ? t(state.tone === 'warn' ? '{bot} runs on {engine}, which needs signing in on “{device}”.' : '{bot} runs on {engine}, which is not installed on “{device}”.', {
+                bot: bot.name,
+                engine: engine.name,
+                device: device.name,
+              })
+            : t('Engine “{engine}” is not available on “{device}”.', { engine: bot.engine, device: device.name }),
+          hint: engine && (engine.kind === 'claude' || engine.kind === 'codex') ? undefined : engine?.setupHint && t(engine.setupHint),
+          action: engine?.kind === 'claude' || engine?.kind === 'codex' ? { label: t('Sign in under Settings'), onClick: onOpenAccounts } : { label: t('Edit bot'), onClick: onEditBot },
           hard: true,
         }
       : !online
-        ? { text: `„${device.name}” jest offline. Wiadomość poczeka i bot odpowie, gdy urządzenie wróci.`, hard: false }
+        ? { text: t('“{device}” is offline. Your message will wait and the bot will answer when the device is back.', { device: device.name }), hard: false }
         : undefined;
 
   return (
@@ -112,7 +121,7 @@ export function Chat({ db, device, online, bot, engine, conversation, onCreated,
       <header className="chat-head">
         <BotAvatar bot={avatar} />
         <div className="titles">
-          <span className="title">{conversation?.title ?? `Nowa rozmowa: ${bot.name}`}</span>
+          <span className="title">{bot.name}</span>
           <span className="sub">
             <span className={`dot ${online ? 'on' : 'off'}`} aria-hidden />
             <span style={{ whiteSpace: 'nowrap' }}>{device.name}</span>
@@ -126,17 +135,27 @@ export function Chat({ db, device, online, bot, engine, conversation, onCreated,
             )}
           </span>
         </div>
-        <button className="icon-btn" onClick={onEditBot} title="Edytuj bota" aria-label="Edytuj bota">
+        <button className="icon-btn" onClick={onEditBot} title={t('Edit bot')} aria-label={t('Edit bot')}>
           <Pencil size={15} />
         </button>
-        {conversation && (
-          <button className="icon-btn" onClick={remove} title="Usuń rozmowę" aria-label="Usuń rozmowę" disabled={Boolean(running)}>
-            <Trash2 size={16} />
-          </button>
-        )}
+        {conversation &&
+          (confirmClear ? (
+            <>
+              <button className="btn btn-sm btn-danger" onClick={clear} disabled={Boolean(running)}>
+                {t('Clear chat')}
+              </button>
+              <button className="btn btn-sm btn-ghost" onClick={() => setConfirmClear(false)}>
+                {t('Cancel')}
+              </button>
+            </>
+          ) : (
+            <button className="icon-btn" onClick={() => setConfirmClear(true)} title={t('Clear chat: memory stays')} aria-label={t('Clear chat')} disabled={Boolean(running)}>
+              <Eraser size={16} />
+            </button>
+          ))}
       </header>
 
-      {conversation ? (
+      {conversation || loading ? (
         <div className="scroller" ref={scroller}>
           <div className="thread" aria-live="polite">
             {messages.rows.map((m: MessageRow) => (
@@ -156,8 +175,8 @@ export function Chat({ db, device, online, bot, engine, conversation, onCreated,
             {state.tone === 'on' && (
               <div className="suggestions">
                 {SUGGESTIONS.map((s) => (
-                  <button key={s} className="suggestion" onClick={() => send(s)}>
-                    {s}
+                  <button key={s} className="suggestion" onClick={() => send(t(s))}>
+                    {t(s)}
                   </button>
                 ))}
               </div>

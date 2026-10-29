@@ -7,7 +7,6 @@ import { engineOf } from '../lib/format';
 import { useAutoUpdate, useWorkers } from '../lib/workers';
 import { BotEditor } from './BotEditor';
 import { Chat } from './Chat';
-import { ConversationList } from './ConversationList';
 import { DesktopView } from './DesktopView';
 import { DevicesPage } from './DevicesPage';
 import { NeedsWorker } from './NeedsWorker';
@@ -59,7 +58,6 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
   const [editing, setEditing] = useState<string>('new');
   const [deviceId, setDeviceId] = useState<string | undefined>(() => remembered('device'));
   const [botId, setBotId] = useState<string | undefined>(() => remembered('bot'));
-  const [conversationId, setConversationId] = useState<string | undefined>();
   const [visited, setVisited] = useState({ desktop: false, terminal: false });
 
   const device: DeviceRow | undefined = devices.rows.find((d) => d.id === deviceId) ?? devices.rows[0];
@@ -70,10 +68,16 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
   useEffect(() => remember('bot', bot?.id), [bot?.id]);
 
   const botConversations = useMemo(() => conversations.rows.filter((c) => c.bot_id && c.bot_id === bot?.id), [conversations.rows, bot?.id]);
+  const latest = useMemo(() => {
+    const map = new Map<string, ConversationRow>();
+    for (const c of conversations.rows) if (c.bot_id && !map.has(c.bot_id)) map.set(c.bot_id, c);
+    return map;
+  }, [conversations.rows]);
   const busyBots = useMemo(() => new Set(conversations.rows.filter((c) => c.busy && c.bot_id).map((c) => c.bot_id!)), [conversations.rows]);
   const busyDevices = useMemo(() => new Set(conversations.loading ? devices.rows.map((d) => d.id) : conversations.rows.filter((c) => c.busy).map((c) => c.device_id)), [conversations, devices.rows]);
   const updates = useAutoUpdate(workers.workers, busyDevices);
-  const conversation: ConversationRow | undefined = botConversations.find((c) => c.id === conversationId);
+  // One bot, one chat: the newest conversation is the chat; clearing it starts a new one.
+  const conversation: ConversationRow | undefined = botConversations[0];
 
   const online = device ? isDeviceOnline(device, now) : false;
   const worker = device ? workers.workers.find((w) => w.deviceId === device.id) : undefined;
@@ -97,7 +101,7 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
     setView('bot');
   };
 
-  const fullWidth = effectiveView === 'desktop' || effectiveView === 'bot' || needsFirstBot;
+  const fullWidth = effectiveView !== 'settings';
   const editedBot = editing === 'new' ? undefined : bots.rows.find((b) => b.id === editing);
 
   let main: ReactNode = null;
@@ -111,6 +115,7 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
           now={now}
           workers={workers.workers}
           onWorkersChanged={workers.reload}
+          onDeleted={devices.drop}
           onPaired={(d) => {
             setDeviceId(d.id);
             setView('chat');
@@ -133,12 +138,11 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
         first={needsFirstBot}
         onSaved={(b) => {
           setBotId(b.id);
-          setConversationId(undefined);
           setView('chat');
         }}
-        onDeleted={() => {
+        onDeleted={(id) => {
+          bots.drop(id);
           setBotId(undefined);
-          setConversationId(undefined);
           setView('chat');
         }}
         onCancel={needsFirstBot ? undefined : () => setView('chat')}
@@ -147,29 +151,19 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
     );
   } else if (device && bot) {
     main = (
-      <>
-        <ConversationList
-          bot={bot}
-          conversations={botConversations}
-          loading={conversations.loading}
-          selectedId={conversation?.id}
-          onSelect={setConversationId}
-          onNew={() => setConversationId(undefined)}
-        />
-        <Chat
-          key={`${bot.id}:${conversation?.id ?? 'new'}`}
+      <Chat
+          key={bot.id}
           db={db}
           device={device}
           online={online}
           bot={bot}
           engine={engineOf(bot, device)}
           conversation={conversation}
-          onCreated={setConversationId}
-          onDeleted={() => setConversationId(undefined)}
+          loading={conversations.loading}
+          onCleared={conversations.drop}
           onEditBot={() => editBot(bot.id)}
           onOpenAccounts={() => openSettings('accounts')}
         />
-      </>
     );
   }
 
@@ -183,6 +177,7 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
         update={device ? updates.get(device.id) : undefined}
         now={now}
         bots={deviceBots}
+        latest={latest}
         botId={bot?.id}
         busyBots={busyBots}
         view={effectiveView}
@@ -191,12 +186,10 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
         onSelectDevice={(id) => {
           setDeviceId(id);
           setBotId(undefined);
-          setConversationId(undefined);
           if (view !== 'desktop') setView('chat');
         }}
         onSelectBot={(id) => {
           setBotId(id);
-          setConversationId(undefined);
           setView('chat');
         }}
         onNewBot={() => editBot('new')}

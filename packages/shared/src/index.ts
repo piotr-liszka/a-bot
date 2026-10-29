@@ -58,6 +58,8 @@ export interface ConversationRow {
   provider_session_id: string | null;
   busy: boolean;
   last_message_preview: string | null;
+  /** Current step while the bot works, cleared when it finishes. */
+  activity: string | null;
   created_at: string;
   updated_at: string;
 }

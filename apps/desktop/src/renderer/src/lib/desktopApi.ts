@@ -1,4 +1,5 @@
 // Bridge to the Electron main process (SSH workers, desktop tunnel, terminals). Absent in the web build.
+import { t } from './i18n';
 
 export type AuthMethod = 'agent' | 'key' | 'password';
 export type TerminalKind = 'shell' | 'claude-login' | 'codex-login';
@@ -68,5 +69,5 @@ export function bridge(): DesktopBridge | undefined {
 /** Electron prefixes errors thrown in the main process; show only our message. */
 export function bridgeError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
-  return msg.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  return t(msg.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''));
 }

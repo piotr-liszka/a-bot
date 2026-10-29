@@ -4,6 +4,7 @@ import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useEffect, useRef } from 'react';
 import { bridge, bridgeError, type TerminalKind } from '../lib/desktopApi';
+import { t } from '../lib/i18n';
 
 export type XtermState = { kind: 'connecting' } | { kind: 'open' } | { kind: 'closed'; error?: string };
 
@@ -49,7 +50,7 @@ export function Xterm({ workerId, kind, onState, className }: Props) {
     const offExit = api.terminal.onExit((e) => {
       if (e.termId !== termId) return;
       termId = undefined;
-      term.write('\r\n\x1b[2m[sesja zakończona]\x1b[0m\r\n');
+      term.write(`\r\n\x1b[2m[${t('session ended')}]\x1b[0m\r\n`);
       report.current?.({ kind: 'closed' });
     });
     const input = term.onData((d) => termId && api.terminal.write(termId, d));

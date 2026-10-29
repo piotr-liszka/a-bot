@@ -1859,3 +1859,8 @@ textarea.input.textarea {
   margin: 0;
   overflow-wrap: anywhere;
 }
+.input.select-inline {
+  width: auto;
+  height: 32px;
+  appearance: auto;
+}

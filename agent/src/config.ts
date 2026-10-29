@@ -34,7 +34,7 @@ export function loadConfig(): AgentConfig {
     maxParallelJobs: Number(env.A_BOT_MAX_PARALLEL_JOBS || fromFile.maxParallelJobs || 3),
   };
   if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
-    throw new Error('Brak konfiguracji backendu: ustaw A_BOT_SUPABASE_URL i A_BOT_SUPABASE_ANON_KEY (albo supabaseUrl/supabaseAnonKey w ~/.a-bot/agent.json).');
+    throw new Error('Missing backend configuration: set A_BOT_SUPABASE_URL and A_BOT_SUPABASE_ANON_KEY (or supabaseUrl/supabaseAnonKey in ~/.a-bot/agent.json).');
   }
   return cfg;
 }

@@ -1,5 +1,6 @@
 import { AlertTriangle, ArrowUp, Square } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { t } from '../lib/i18n';
 
 interface Props {
   botName: string;
@@ -64,7 +65,7 @@ export function Composer({ botName, disabled, running, blocked, error, onSend, o
       )}
       <div className="composer">
         <label className="sr-only" htmlFor="composer-input">
-          Wiadomość do {botName}
+          {t('Message to {bot}', { bot: botName })}
         </label>
         <textarea
           id="composer-input"
@@ -73,17 +74,17 @@ export function Composer({ botName, disabled, running, blocked, error, onSend, o
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={`Napisz do ${botName}…`}
+          placeholder={t('Write to {bot}…', { bot: botName })}
           disabled={disabled}
         />
         <div className="composer-bar">
-          <span className="hint">{error ? <span className="form-error">{error}</span> : running ? 'Bot pracuje. Możesz go zatrzymać.' : 'Enter wysyła, Shift+Enter dodaje nową linię'}</span>
+          <span className="hint">{error ? <span className="form-error">{error}</span> : running ? t('The bot is working. You can stop it.') : t('Enter sends, Shift+Enter adds a new line')}</span>
           {running ? (
-            <button className="send stop" onClick={onStop} aria-label="Zatrzymaj" title="Zatrzymaj">
+            <button className="send stop" onClick={onStop} aria-label={t('Stop')} title={t('Stop')}>
               <Square size={13} fill="currentColor" />
             </button>
           ) : (
-            <button className="send" onClick={submit} disabled={!text.trim() || sending || disabled} aria-label="Wyślij" title="Wyślij">
+            <button className="send" onClick={submit} disabled={!text.trim() || sending || disabled} aria-label={t('Send')} title={t('Send')}>
               <ArrowUp size={17} strokeWidth={2.4} />
             </button>
           )}

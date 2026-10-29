@@ -31,21 +31,21 @@ export function createCodexParser(emit: RunContext['emit']) {
             }
             return;
           case 'reasoning':
-            if (item.text) emit.step({ id: item.id, kind: 'thinking', title: 'Myślenie', output: tail(item.text, 2000), status: 'done' });
+            if (item.text) emit.step({ id: item.id, kind: 'thinking', title: 'Thinking', output: tail(item.text, 2000), status: 'done' });
             return;
           case 'command_execution':
-            emit.step({ id: item.id, kind: 'command', title: item.command ?? 'polecenie', output: item.aggregated_output ? tail(item.aggregated_output) : undefined, status });
+            emit.step({ id: item.id, kind: 'command', title: item.command ?? 'command', output: item.aggregated_output ? tail(item.aggregated_output) : undefined, status });
             return;
           case 'file_change': {
             const files = (item.changes ?? []).map((c: any) => `${c.kind ?? 'zmiana'} ${c.path}`).join('\n');
-            emit.step({ id: item.id, kind: 'file', title: 'Zmiana plików', output: files, status });
+            emit.step({ id: item.id, kind: 'file', title: 'File changes', output: files, status });
             return;
           }
           case 'mcp_tool_call':
             emit.step({ id: item.id, kind: 'tool', title: `${item.server ?? 'mcp'} · ${item.tool ?? ''}`, status });
             return;
           case 'web_search':
-            emit.step({ id: item.id, kind: 'tool', title: `Wyszukiwanie: ${item.query ?? ''}`, status });
+            emit.step({ id: item.id, kind: 'tool', title: `Search: ${item.query ?? ''}`, status });
             return;
           case 'todo_list':
             emit.step({
@@ -67,10 +67,10 @@ export function createCodexParser(emit: RunContext['emit']) {
         emit.usage({ inputTokens: ev.usage?.input_tokens, outputTokens: ev.usage?.output_tokens });
         return;
       case 'turn.failed':
-        state.error = ev.error?.message ?? 'Codex nie dokończył odpowiedzi';
+        state.error = ev.error?.message ?? 'Codex did not finish its answer';
         return;
       case 'error':
-        state.error = ev.message ?? 'Błąd Codex';
+        state.error = ev.message ?? 'Codex error';
         return;
     }
   };
@@ -85,13 +85,13 @@ export const codexProvider: Provider = {
       id: 'codex',
       kind: 'codex',
       name: 'Codex',
-      description: 'Agent OpenAI działający na subskrypcji ChatGPT, z pełnym dostępem do kontenera.',
+      description: 'OpenAI’s agent on your ChatGPT subscription, with full access to the container.',
       installed: false,
       authenticated: false,
       models: [],
     };
     if (!(await which('codex'))) {
-      info.setupHint = 'Zainstaluj: npm i -g @openai/codex';
+      info.setupHint = 'Install: npm i -g @openai/codex';
       return info;
     }
     info.installed = true;
@@ -99,7 +99,7 @@ export const codexProvider: Provider = {
     info.version = v.stdout.trim().replace(/^codex-cli\s*/, '') || undefined;
     const s = await exec('codex', ['login', 'status']);
     info.authenticated = s.code === 0;
-    if (!info.authenticated) info.setupHint = 'Zaloguj w Ustawienia → Konta modeli albo w kontenerze: codex login --device-auth';
+    if (!info.authenticated) info.setupHint = 'Sign in under Settings → Model accounts, or in the container: codex login --device-auth';
     return info;
   },
   async run(ctx) {
@@ -112,6 +112,6 @@ export const codexProvider: Provider = {
     const res = await streamLines('codex', args, { cwd: ctx.cwd, signal: ctx.signal, onLine: parser.handle });
     if (ctx.signal.aborted) return;
     if (parser.state.error) throw new ProviderError(parser.state.error);
-    if (res.code !== 0) throw new ProviderError(tail(res.stderr.trim(), 1500) || `codex zakończył się kodem ${res.code}`);
+    if (res.code !== 0) throw new ProviderError(tail(res.stderr.trim(), 1500) || `codex exited with code ${res.code}`);
   },
 };

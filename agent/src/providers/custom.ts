@@ -29,13 +29,13 @@ export function customProvider(cfg: CustomProviderConfig): Provider {
         id: cfg.id,
         kind: 'custom',
         name: cfg.name,
-        description: cfg.description ?? `Własne CLI: ${cfg.command.join(' ')}`,
+        description: cfg.description ?? `Custom CLI: ${cfg.command.join(' ')}`,
         installed,
         authenticated: installed,
         version,
         models: cfg.models ?? [],
         defaultModel: cfg.models?.[0],
-        setupHint: installed ? undefined : `Nie znaleziono polecenia ${bin} w kontenerze.`,
+        setupHint: installed ? undefined : `Command ${bin} not found in the container.`,
       };
     },
     async run(ctx) {
@@ -49,7 +49,7 @@ export function customProvider(cfg: CustomProviderConfig): Provider {
           first = false;
         },
       });
-      if (!ctx.signal.aborted && res.code !== 0) throw new ProviderError(tail(res.stderr.trim(), 1500) || `${bin} zakończył się kodem ${res.code}`);
+      if (!ctx.signal.aborted && res.code !== 0) throw new ProviderError(tail(res.stderr.trim(), 1500) || `${bin} exited with code ${res.code}`);
     },
   };
 }

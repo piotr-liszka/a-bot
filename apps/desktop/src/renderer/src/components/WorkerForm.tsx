@@ -4,14 +4,15 @@ import { AlertCircle, Check, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { activeBackend, friendlyError } from '../lib/backend';
 import { bridge, bridgeError, type AuthMethod, type InstallEvent, type InstallStep, type WorkerInfo, type WorkerInput } from '../lib/desktopApi';
+import { t } from '../lib/i18n';
 
 const STEPS: { id: InstallStep; label: string }[] = [
-  { id: 'connect', label: 'Łączę się przez SSH' },
-  { id: 'docker', label: 'Sprawdzam Dockera' },
-  { id: 'upload', label: 'Wysyłam sandbox' },
-  { id: 'build', label: 'Buduję obraz (za pierwszym razem kilka minut)' },
-  { id: 'start', label: 'Uruchamiam kontener' },
-  { id: 'pair', label: 'Paruję z Twoim kontem' },
+  { id: 'connect', label: 'Connecting over SSH' },
+  { id: 'docker', label: 'Checking Docker' },
+  { id: 'upload', label: 'Uploading the sandbox' },
+  { id: 'build', label: 'Building the image (a few minutes the first time)' },
+  { id: 'start', label: 'Starting the container' },
+  { id: 'pair', label: 'Pairing with your account' },
 ];
 
 interface Props {
@@ -73,7 +74,7 @@ export function WorkerForm({ db, device, worker, onDone, onCancel }: Props) {
     setTestResult(undefined);
     try {
       const r = await api.workers.test(payload());
-      setTestResult(`Połączono. Docker ${r.docker}.`);
+      setTestResult(t('Connected. Docker {version}.', { version: r.docker }));
     } catch (err) {
       setError(bridgeError(err));
     }
@@ -99,12 +100,12 @@ export function WorkerForm({ db, device, worker, onDone, onCancel }: Props) {
         paired = data;
       } else if (result.deviceId) {
         const { data } = await db.from('devices').select('*').eq('id', result.deviceId).maybeSingle<DeviceRow>();
-        if (!data) throw new Error('Ten worker jest już sparowany z innym kontem a-bot. Usuń go tam albo wyczyść wolumen a-bot_a-bot-home na workerze.');
+        if (!data) throw new Error(t('This worker is already paired with another a-bot account. Remove it there or clear the a-bot_a-bot-home volume on the worker.'));
         paired = data;
       }
-      if (!paired) throw new Error('Agent nie podał kodu parowania.');
+      if (!paired) throw new Error(t('The agent did not report a pairing code.'));
       await api.workers.link(saved.id, paired.id);
-      setSteps((s) => ({ ...s, pair: { status: 'done', log: `Sparowano jako „${paired!.name}”` } }));
+      setSteps((s) => ({ ...s, pair: { status: 'done', log: t('Paired as “{name}”', { name: paired!.name }) } }));
       setPhase('done');
       onDone(paired, { ...saved, deviceId: paired.id });
     } catch (err) {
@@ -124,53 +125,53 @@ export function WorkerForm({ db, device, worker, onDone, onCancel }: Props) {
     <form className="worker-form" onSubmit={install}>
       <fieldset disabled={busy} className="worker-grid">
         <label className="field span-2">
-          <span>Nazwa workera</span>
-          <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="np. BeniaminPC" maxLength={80} />
+          <span>{t('Worker name')}</span>
+          <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder={t('e.g. BeniaminPC')} maxLength={80} />
         </label>
         <label className="field">
-          <span>Host</span>
-          <input className="input" value={form.host} onChange={(e) => set('host', e.target.value)} placeholder="192.168.1.20 albo beniamin-pc.local" required />
+          <span>{t('Host')}</span>
+          <input className="input" value={form.host} onChange={(e) => set('host', e.target.value)} placeholder={t('192.168.1.20 or beniamin-pc.local')} required />
         </label>
         <label className="field">
-          <span>Port</span>
+          <span>{t('Port')}</span>
           <input className="input tabular" type="number" min={1} max={65535} value={form.port} onChange={(e) => set('port', Number(e.target.value) || 22)} />
         </label>
         <label className="field">
-          <span>Użytkownik</span>
+          <span>{t('User')}</span>
           <input className="input" value={form.username} onChange={(e) => set('username', e.target.value)} placeholder="piotr" required autoComplete="off" />
         </label>
         <label className="field">
-          <span>Logowanie</span>
+          <span>{t('Sign-in method')}</span>
           <select className="input" value={form.auth} onChange={(e) => set('auth', e.target.value as AuthMethod)}>
-            <option value="agent">Agent SSH (ssh-agent)</option>
-            <option value="key">Plik klucza</option>
-            <option value="password">Hasło</option>
+            <option value="agent">{t('SSH agent (ssh-agent)')}</option>
+            <option value="key">{t('Key file')}</option>
+            <option value="password">{t('Password')}</option>
           </select>
         </label>
         {form.auth === 'key' && (
           <>
             <label className="field">
-              <span>Klucz prywatny</span>
+              <span>{t('Private key')}</span>
               <input className="input" value={form.keyPath} onChange={(e) => set('keyPath', e.target.value)} />
             </label>
             <label className="field">
-              <span>Hasło do klucza</span>
-              <input className="input" type="password" value={form.secret} onChange={(e) => set('secret', e.target.value)} placeholder={worker?.hasSecret ? 'zapisane' : 'jeśli jest'} />
+              <span>{t('Key passphrase')}</span>
+              <input className="input" type="password" value={form.secret} onChange={(e) => set('secret', e.target.value)} placeholder={worker?.hasSecret ? t('saved') : t('if any')} />
             </label>
           </>
         )}
         {form.auth === 'password' && (
           <label className="field span-2">
-            <span>Hasło</span>
-            <input className="input" type="password" value={form.secret} onChange={(e) => set('secret', e.target.value)} placeholder={worker?.hasSecret ? 'zapisane' : ''} required={!worker?.hasSecret} />
+            <span>{t('Password')}</span>
+            <input className="input" type="password" value={form.secret} onChange={(e) => set('secret', e.target.value)} placeholder={worker?.hasSecret ? t('saved') : ''} required={!worker?.hasSecret} />
           </label>
         )}
         <label className="field span-2">
-          <span>Katalog na workerze widoczny w sandboxie jako /workspace</span>
+          <span>{t('Folder on the worker, visible in the sandbox as /workspace')}</span>
           <input className="input" value={form.workspaceDir} onChange={(e) => set('workspaceDir', e.target.value)} />
         </label>
       </fieldset>
-      <p className="hint">Dane logowania SSH zostają na tym komputerze, zaszyfrowane. Na workerze potrzebny jest tylko Docker.</p>
+      <p className="hint">{t('SSH credentials stay on this computer, encrypted. The worker only needs Docker.')}</p>
 
       {showProgress && (
         <div className="install">
@@ -182,7 +183,7 @@ export function WorkerForm({ db, device, worker, onDone, onCancel }: Props) {
                   <span className="install-icon" aria-hidden>
                     {st.status === 'done' ? <Check size={13} strokeWidth={2.6} /> : st.status === 'running' ? <Loader2 size={13} className="spin" /> : st.status === 'error' ? <AlertCircle size={13} /> : null}
                   </span>
-                  <span>{s.label}</span>
+                  <span>{t(s.label)}</span>
                   {st.status !== 'idle' && st.log && s.id !== 'build' && <span className="install-log">{st.log}</span>}
                 </li>
               );
@@ -201,14 +202,14 @@ export function WorkerForm({ db, device, worker, onDone, onCancel }: Props) {
 
       <div className="form-actions">
         <button className="btn btn-primary" disabled={busy || !form.host || !form.username}>
-          {phase === 'installing' ? 'Instaluję…' : worker ? 'Zainstaluj ponownie' : 'Połącz i zainstaluj'}
+          {phase === 'installing' ? t('Installing…') : worker ? t('Reinstall') : t('Connect and install')}
         </button>
         <button type="button" className="btn" onClick={test} disabled={busy || !form.host || !form.username}>
-          {phase === 'testing' ? 'Sprawdzam…' : 'Sprawdź połączenie'}
+          {phase === 'testing' ? t('Checking…') : t('Test connection')}
         </button>
         {onCancel && (
           <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={phase === 'installing'}>
-            Anuluj
+            {t('Cancel')}
           </button>
         )}
       </div>

@@ -1,6 +1,6 @@
 import type { BotRow, ConversationRow, DeviceRow, MessageRow } from '@a-bot/shared';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export function useSession(db: SupabaseClient): Session | null | undefined {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -20,8 +20,11 @@ interface LiveOptions {
   ascending: boolean;
 }
 
-/** Loads rows matching column=value and keeps them in sync through Realtime. */
-function useLiveRows<T extends { id: string }>(db: SupabaseClient, opts: LiveOptions): { rows: T[]; loading: boolean; error?: string } {
+/**
+ * Loads rows matching column=value and keeps them in sync through Realtime. Realtime cannot filter DELETE events,
+ * so the caller drops rows it deleted itself with `drop`.
+ */
+function useLiveRows<T extends { id: string }>(db: SupabaseClient, opts: LiveOptions): { rows: T[]; loading: boolean; error?: string; drop: (id: string) => void } {
   const { table, column, value, orderBy, ascending } = opts;
   const [state, setState] = useState<{ rows: T[]; loading: boolean; error?: string }>({ rows: [], loading: true });
 
@@ -70,7 +73,8 @@ function useLiveRows<T extends { id: string }>(db: SupabaseClient, opts: LiveOpt
     };
   }, [db, table, column, value, orderBy, ascending]);
 
-  return state;
+  const drop = useCallback((id: string) => setState((prev) => ({ ...prev, rows: prev.rows.filter((r) => r.id !== id) })), []);
+  return { ...state, drop };
 }
 
 export function useDevices(db: SupabaseClient, uid: string | undefined) {

@@ -86,7 +86,7 @@ function decodeSecret(w: StoredWorker): string | undefined {
 function boxDir(): string {
   const candidates = [join(process.resourcesPath ?? '', 'box'), join(app.getAppPath(), '../../dist/box'), join(process.cwd(), 'dist/box'), join(process.cwd(), '../../dist/box')];
   const found = candidates.find((p) => existsSync(join(p, 'Dockerfile')));
-  if (!found) throw new Error('Brak paczki sandboxa. Uruchom „npm run box:pack” w repozytorium.');
+  if (!found) throw new Error('The sandbox package is missing. Run “npm run box:pack” in the repository.');
   return found;
 }
 
@@ -94,7 +94,7 @@ function connectConfig(w: WorkerInput | StoredWorker, secret: string | undefined
   const cfg: ConnectConfig = { host: w.host, port: w.port || 22, username: w.username, readyTimeout: 15_000, keepaliveInterval: 15_000 };
   if (w.auth === 'agent') {
     cfg.agent = process.platform === 'win32' ? 'pageant' : process.env.SSH_AUTH_SOCK;
-    if (!cfg.agent) throw new Error('Nie widzę agenta SSH (SSH_AUTH_SOCK). Wybierz klucz albo hasło.');
+    if (!cfg.agent) throw new Error('No SSH agent found (SSH_AUTH_SOCK). Choose a key or a password.');
   } else if (w.auth === 'key') {
     const keyPath = (w.keyPath || '~/.ssh/id_ed25519').replace(/^~(?=$|\/)/, homedir());
     if (!existsSync(keyPath)) throw new Error(`Nie ma pliku klucza ${keyPath}.`);
@@ -107,11 +107,11 @@ function connectConfig(w: WorkerInput | StoredWorker, secret: string | undefined
 }
 
 function friendlySshError(err: Error & { level?: string; code?: string }): string {
-  if (err.level === 'client-authentication') return 'Serwer odrzucił logowanie. Sprawdź użytkownika i klucz albo hasło.';
-  if (err.code === 'ENOTFOUND') return 'Nie znam takiego hosta.';
-  if (err.code === 'ECONNREFUSED') return 'Połączenie odrzucone. Czy działa tam serwer SSH na tym porcie?';
-  if (err.code === 'ETIMEDOUT' || /Timed out/i.test(err.message)) return 'Host nie odpowiada. Sprawdź adres i sieć.';
-  if (/passphrase/i.test(err.message)) return 'Klucz jest zabezpieczony hasłem. Podaj je w polu „Hasło do klucza”.';
+  if (err.level === 'client-authentication') return 'The server rejected the sign-in. Check the user and the key or password.';
+  if (err.code === 'ENOTFOUND') return 'Unknown host.';
+  if (err.code === 'ECONNREFUSED') return 'Connection refused. Is an SSH server running on that port?';
+  if (err.code === 'ETIMEDOUT' || /Timed out/i.test(err.message)) return 'The host does not respond. Check the address and the network.';
+  if (/passphrase/i.test(err.message)) return 'The key has a passphrase. Enter it under “Key passphrase”.';
   return err.message;
 }
 
@@ -247,7 +247,7 @@ export class WorkerManager {
 
   private stored(id: string): StoredWorker {
     const w = readStore().find((x) => x.id === id);
-    if (!w) throw new Error('Nie ma takiego workera.');
+    if (!w) throw new Error('No such worker.');
     return w;
   }
 
@@ -329,7 +329,7 @@ export class WorkerManager {
       step = 'build';
       emit({ step, status: 'running' });
       const build = await run(c, `cd ${shellQuote(remoteDir)} && docker compose -p a-bot build 2>&1`, (line) => emit({ step: 'build', status: 'running', log: line }));
-      if (build.code !== 0) throw new Error(`Budowanie obrazu nie powiodło się:\n${build.out.split('\n').slice(-12).join('\n')}`);
+      if (build.code !== 0) throw new Error(`Building the image failed:\n${build.out.split('\n').slice(-12).join('\n')}`);
       emit({ step, status: 'done' });
 
       step = 'start';
@@ -337,15 +337,15 @@ export class WorkerManager {
       // A container from an earlier manual setup may hold the name; replace it (its volume, and so the device identity, stays).
       await run(c, `docker ps -a --format '{{.Names}} {{.Label "com.docker.compose.project.working_dir"}}' | awk '$1=="a-bot" && $2!=${shellQuote(remoteDir)} {print $1}' | xargs -r docker rm -f`);
       const up = await run(c, `cd ${shellQuote(remoteDir)} && docker compose -p a-bot up -d --remove-orphans 2>&1`, (line) => emit({ step: 'start', status: 'running', log: line }));
-      if (up.code !== 0) throw new Error(`Uruchomienie nie powiodło się:\n${up.out.split('\n').slice(-8).join('\n')}`);
+      if (up.code !== 0) throw new Error(`Starting failed:\n${up.out.split('\n').slice(-8).join('\n')}`);
       const bundled = boxVersion();
       if (bundled) await run(c, `printf '%s\\n' ${shellQuote(bundled)} > ${shellQuote(posix.join(remoteDir, 'VERSION'))}`);
       emit({ step, status: 'done' });
 
       step = 'pair';
-      emit({ step, status: 'running', log: 'Czekam na agenta…' });
+      emit({ step, status: 'running', log: 'Waiting for the agent…' });
       const result = await waitForAgent(c);
-      emit({ step, status: 'running', log: result.pairingCode ? `Kod: ${result.pairingCode}` : 'Urządzenie jest już sparowane.' });
+      emit({ step, status: 'running', log: result.pairingCode ? `Code: ${result.pairingCode}` : 'The device is already paired.' });
       return result;
     } catch (err) {
       emit({ step, status: 'error', error: err instanceof Error ? err.message : String(err) });
@@ -357,7 +357,7 @@ export class WorkerManager {
   async desktop(id: string): Promise<{ url: string; password: string }> {
     const c = await this.client(id);
     const pw = await run(c, 'docker exec a-bot cat /root/.a-bot/vnc-password 2>&1');
-    if (pw.code !== 0) throw new Error(/No such container|is not running/i.test(pw.out) ? 'Kontener a-bot nie działa na tym workerze.' : pw.out.trim());
+    if (pw.code !== 0) throw new Error(/No such container|is not running/i.test(pw.out) ? 'The a-bot container is not running on this worker.' : pw.out.trim());
     let tunnel = this.tunnels.get(id);
     if (!tunnel) {
       const server = createServer((socket) => {
@@ -425,9 +425,9 @@ export class WorkerManager {
 async function dockerVersion(c: Client): Promise<string> {
   const v = await run(c, "docker version --format '{{.Server.Version}}' 2>&1");
   if (v.code === 0) return v.out.trim();
-  if (/permission denied/i.test(v.out)) throw new Error('Użytkownik nie ma dostępu do Dockera. Dodaj go do grupy docker: sudo usermod -aG docker $USER (i zaloguj się ponownie).');
-  if (/not found/i.test(v.out)) throw new Error('Na tym komputerze nie ma Dockera. Zainstaluj Docker Engine i spróbuj ponownie.');
-  throw new Error(`Docker nie odpowiada: ${v.out.trim()}`);
+  if (/permission denied/i.test(v.out)) throw new Error('This user cannot use Docker. Add it to the docker group: sudo usermod -aG docker $USER (and sign in again).');
+  if (/not found/i.test(v.out)) throw new Error('Docker is not installed on this computer. Install Docker Engine and try again.');
+  throw new Error(`Docker does not respond: ${v.out.trim()}`);
 }
 
 /** Reads the agent's log until it shows a pairing code or reports that it is already paired. */
@@ -435,14 +435,16 @@ async function waitForAgent(c: Client): Promise<{ pairingCode?: string; deviceId
   const started = Date.now();
   while (Date.now() - started < 120_000) {
     const { out } = await run(c, 'docker logs --tail 200 a-bot 2>&1');
-    const deviceId = out.match(/id urządzenia ([0-9a-f-]{36})/)?.[1];
-    const codes = [...out.matchAll(/Kod parowania:\s+([A-Z0-9]{3}) ([A-Z0-9]{3})/g)];
-    const paired = /sparowano jako/.test(out.slice(out.lastIndexOf('id urządzenia')));
+    // Agents before 0.2 logged in Polish; accept both.
+    const ids = [...out.matchAll(/(?:device id|id urządzenia) ([0-9a-f-]{36})/g)];
+    const deviceId = ids[ids.length - 1]?.[1];
+    const codes = [...out.matchAll(/(?:Pairing code|Kod parowania):\s+([A-Z0-9]{3}) ([A-Z0-9]{3})/g)];
+    const paired = /paired as|sparowano jako/.test(out.slice(ids[ids.length - 1]?.index ?? 0));
     if (deviceId && paired) return { deviceId };
     if (codes.length) return { pairingCode: codes[codes.length - 1].slice(1).join(''), deviceId };
     const fatal = out.match(/✗ (.+)$/m);
-    if (fatal && /konfiguracji backendu|Logowanie agenta/.test(fatal[1])) throw new Error(fatal[1]);
+    if (fatal && /backend configuration|Agent sign-in|konfiguracji backendu|Logowanie agenta/.test(fatal[1])) throw new Error(fatal[1]);
     await new Promise((r) => setTimeout(r, 1500));
   }
-  throw new Error('Agent nie zgłosił się w ciągu 2 minut. Sprawdź: docker logs a-bot');
+  throw new Error('The agent did not report within 2 minutes. Check: docker logs a-bot');
 }

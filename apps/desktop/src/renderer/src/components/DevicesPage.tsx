@@ -7,6 +7,7 @@ import { bridge, type WorkerInfo } from '../lib/desktopApi';
 import { botState, relativeSeen } from '../lib/format';
 import { BotAvatar } from './BotAvatar';
 import { WorkerForm } from './WorkerForm';
+import { t } from '../lib/i18n';
 
 interface Props {
   db: SupabaseClient;
@@ -15,10 +16,11 @@ interface Props {
   now: number;
   workers: WorkerInfo[];
   onWorkersChanged: () => void;
+  onDeleted: (id: string) => void;
   onPaired: (device: DeviceRow) => void;
 }
 
-export function DevicesPage({ db, devices, loading, now, workers, onWorkersChanged, onPaired }: Props) {
+export function DevicesPage({ db, devices, loading, now, workers, onWorkersChanged, onDeleted, onPaired }: Props) {
   const first = !loading && devices.length === 0;
   const ssh = Boolean(bridge());
   return (
@@ -27,11 +29,10 @@ export function DevicesPage({ db, devices, loading, now, workers, onWorkersChang
         <div className="page-inner">
           <div>
             <div className="page-head">
-              <h1>{first ? 'Dodaj swojego pierwszego workera' : 'Urządzenia'}</h1>
+              <h1>{first ? t('Add your first worker') : t('Devices')}</h1>
             </div>
             <p className="page-lede">
-              Worker to dowolny komputer lub serwer z Dockerem. Działa na nim jeden wspólny sandbox z Linuksem, pulpitem i przeglądarką, w którym pracują
-              wszystkie Twoje boty. Wybrany katalog jest w nim widoczny jako <code>/workspace</code>.
+              {t('A worker is any computer or server with Docker. It runs one shared Linux sandbox with a desktop and a browser, where all your bots work. The folder you pick is visible inside as /workspace.')}
             </p>
           </div>
           {loading && <div className="skeleton" style={{ height: 120 }} />}
@@ -44,14 +45,15 @@ export function DevicesPage({ db, devices, loading, now, workers, onWorkersChang
               now={now}
               worker={workers.find((w) => w.deviceId === d.id)}
               onWorkersChanged={onWorkersChanged}
+              onDeleted={onDeleted}
             />
           ))}
           {ssh ? (
             <>
               <section className="pair" aria-labelledby="add-worker">
                 <div>
-                  <h2 id="add-worker">Dodaj workera przez SSH</h2>
-                  <p className="page-lede">Połączę się z komputerem, zbuduję tam sandbox i sparuję go z Twoim kontem. Wystarczy, że ma Dockera.</p>
+                  <h2 id="add-worker">{t('Add a worker over SSH')}</h2>
+                  <p className="page-lede">{t('The app connects to the computer, builds the sandbox there and pairs it with your account. All it needs is Docker.')}</p>
                 </div>
                 <WorkerForm
                   key={devices.length}
@@ -63,7 +65,7 @@ export function DevicesPage({ db, devices, loading, now, workers, onWorkersChang
                 />
               </section>
               <details className="manual">
-                <summary>Sandbox uruchomiony ręcznie? Sparuj kodem</summary>
+                <summary>{t('Started the sandbox by hand? Pair with a code')}</summary>
                 <PairForm db={db} onPaired={onPaired} />
               </details>
             </>
@@ -83,9 +85,10 @@ interface CardProps {
   now: number;
   worker?: WorkerInfo;
   onWorkersChanged: () => void;
+  onDeleted: (id: string) => void;
 }
 
-function DeviceCard({ db, device, online, now, worker, onWorkersChanged }: CardProps) {
+function DeviceCard({ db, device, online, now, worker, onWorkersChanged, onDeleted }: CardProps) {
   const [editingSsh, setEditingSsh] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState(device.name);
@@ -111,37 +114,40 @@ function DeviceCard({ db, device, online, now, worker, onWorkersChanged }: CardP
         <div className="meta">
           {renaming ? (
             <form onSubmit={rename} style={{ display: 'flex', gap: 8 }}>
-              <input className="input" style={{ height: 30, maxWidth: 260 }} value={name} onChange={(e) => setName(e.target.value)} autoFocus maxLength={80} aria-label="Nazwa urządzenia" />
-              <button className="btn btn-sm btn-primary">Zapisz</button>
+              <input className="input" style={{ height: 30, maxWidth: 260 }} value={name} onChange={(e) => setName(e.target.value)} autoFocus maxLength={80} aria-label={t('Device name')} />
+              <button className="btn btn-sm btn-primary">{t('Save')}</button>
               <button type="button" className="btn btn-sm btn-ghost" onClick={() => setRenaming(false)}>
-                Anuluj
+                {t('Cancel')}
               </button>
             </form>
           ) : (
             <div className="name">{device.name}</div>
           )}
           <div className="sub">
-            {online ? 'Online' : `Offline, ostatnio ${relativeSeen(device.last_seen, now)}`}
+            {online ? t('Online') : t('Offline, last seen {when}', { when: relativeSeen(device.last_seen, now) })}
             {details ? ` · ${details}` : ''}
           </div>
         </div>
-        <button className="icon-btn" onClick={refresh} disabled={!online || refreshing} title="Wykryj silniki ponownie" aria-label="Wykryj silniki ponownie">
+        <button className="icon-btn" onClick={refresh} disabled={!online || refreshing} title={t('Detect engines again')} aria-label={t('Detect engines again')}>
           <RefreshCw size={15} style={refreshing ? { animation: 'spin 1s linear infinite' } : undefined} />
         </button>
-        <button className="icon-btn" onClick={() => setRenaming(true)} title="Zmień nazwę" aria-label="Zmień nazwę">
+        <button className="icon-btn" onClick={() => setRenaming(true)} title={t('Rename')} aria-label={t('Rename')}>
           <Pencil size={15} />
         </button>
         {confirmDelete ? (
           <>
-            <button className="btn btn-sm btn-danger" onClick={() => db.from('devices').delete().eq('id', device.id)}>
-              Usuń z historią
+            <button className="btn btn-sm btn-danger" onClick={async () => {
+                const { error } = await db.from('devices').delete().eq('id', device.id);
+                if (!error) onDeleted(device.id);
+              }}>
+              {t('Delete with history')}
             </button>
             <button className="btn btn-sm btn-ghost" onClick={() => setConfirmDelete(false)}>
-              Anuluj
+              {t('Cancel')}
             </button>
           </>
         ) : (
-          <button className="icon-btn" onClick={() => setConfirmDelete(true)} title="Usuń urządzenie" aria-label="Usuń urządzenie">
+          <button className="icon-btn" onClick={() => setConfirmDelete(true)} title={t('Delete device')} aria-label={t('Delete device')}>
             <Trash2 size={15} />
           </button>
         )}
@@ -150,9 +156,9 @@ function DeviceCard({ db, device, online, now, worker, onWorkersChanged }: CardP
         <table className="providers">
           <thead>
             <tr>
-              <th>Silnik</th>
-              <th>Stan</th>
-              <th>Wersja</th>
+              <th>{t('Engine')}</th>
+              <th>{t('Status')}</th>
+              <th>{t('Version')}</th>
             </tr>
           </thead>
           <tbody>
@@ -166,10 +172,10 @@ function DeviceCard({ db, device, online, now, worker, onWorkersChanged }: CardP
                     </div>
                     {p.setupHint && s.tone !== 'on' && (
                       <div className="setup-hint">
-                        <HintText hint={p.setupHint} />
+                        <HintText hint={t(p.setupHint)} />
                       </div>
                     )}
-                    {p.setupHint && s.tone === 'on' && <div className="setup-hint">{p.setupHint}</div>}
+                    {p.setupHint && s.tone === 'on' && <div className="setup-hint">{t(p.setupHint)}</div>}
                   </td>
                   <td>
                     <span className="state">
@@ -184,15 +190,15 @@ function DeviceCard({ db, device, online, now, worker, onWorkersChanged }: CardP
         </table>
       ) : (
         <p className="hint" style={{ padding: '0 16px 14px' }}>
-          Agent jeszcze nie przysłał listy silników.
+          {t('The agent has not reported its engines yet.')}
         </p>
       )}
       {bridge() && (
         <div className="device-ssh">
           <KeyRound size={14} aria-hidden />
-          <span className="grow">{worker ? `SSH: ${worker.username}@${worker.host}${worker.port !== 22 ? `:${worker.port}` : ''}` : 'Brak dostępu SSH z tego komputera (pulpit i terminal niedostępne)'}</span>
+          <span className="grow">{worker ? `SSH: ${worker.username}@${worker.host}${worker.port !== 22 ? `:${worker.port}` : ''}` : t('No SSH access from this computer (desktop and terminal unavailable)')}</span>
           <button className="btn btn-sm" onClick={() => setEditingSsh((v) => !v)}>
-            {editingSsh ? 'Zamknij' : worker ? 'Zainstaluj ponownie' : 'Połącz przez SSH'}
+            {editingSsh ? t('Close') : worker ? t('Reinstall') : t('Connect over SSH')}
           </button>
           {worker && (
             <button
@@ -202,7 +208,7 @@ function DeviceCard({ db, device, online, now, worker, onWorkersChanged }: CardP
                 onWorkersChanged();
               }}
             >
-              Zapomnij SSH
+              {t('Forget SSH')}
             </button>
           )}
         </div>
@@ -243,8 +249,8 @@ function CopyBlock({ text }: { text: string }) {
       {text}
       <button
         className="icon-btn"
-        aria-label="Kopiuj"
-        title="Kopiuj"
+        aria-label={t('Copy')}
+        title={t('Copy')}
         onClick={() => {
           navigator.clipboard.writeText(text).then(() => {
             setCopied(true);
@@ -267,12 +273,12 @@ function PairForm({ db, onPaired }: { db: SupabaseClient; onPaired: (d: DeviceRo
   async function submit(e: FormEvent) {
     e.preventDefault();
     const normalized = normalizePairingCode(code);
-    if (normalized.length !== 6) return setError('Kod ma 6 znaków, np. K7P 2QX.');
+    if (normalized.length !== 6) return setError(t('The code has 6 characters, e.g. K7P 2QX.'));
     setBusy(true);
     setError(undefined);
     const { data, error } = await db.rpc('claim_pairing', { p_code: normalized }).single<DeviceRow>();
     setBusy(false);
-    if (error) return setError(/wygasł|nieprawidłowy/i.test(error.message) ? 'Kod jest nieprawidłowy albo wygasł. Agent pokazuje nowy kod co 15 minut.' : friendlyError(error));
+    if (error) return setError(/wygasł|nieprawidłowy|expired|invalid/i.test(error.message) ? t('The code is wrong or has expired. The agent shows a new code every 15 minutes.') : friendlyError(error));
     setCode('');
     onPaired(data);
   }
@@ -282,31 +288,31 @@ npm install && npm run box:pack && cd dist/box
 cat > .env <<'ENV'
 A_BOT_SUPABASE_URL=${backend?.url ?? ''}
 A_BOT_SUPABASE_ANON_KEY=${backend?.anonKey ?? ''}
-A_BOT_DEVICE_NAME=Mój serwer
+A_BOT_DEVICE_NAME=My server
 A_BOT_WORKSPACE_DIR=$HOME/a-bot-workspace
 ENV
 docker compose -p a-bot up -d --build`;
 
   return (
     <section className="pair" aria-labelledby="pair-title">
-      <h2 id="pair-title">Dodaj urządzenie</h2>
+      <h2 id="pair-title">{t('Add device')}</h2>
       <ol className="pair-steps">
         <li>
           <div>
-            <strong>Uruchom sandbox na workerze</strong>
-            <p>Potrzebujesz Dockera. Adres serwera i klucz są już wpisane.</p>
+            <strong>{t('Start the sandbox on the worker')}</strong>
+            <p>{t('You need Docker. The server address and key are already filled in.')}</p>
             <CopyBlock text={setup} />
           </div>
         </li>
         <li>
           <div>
-            <strong>Odczytaj kod parowania</strong>
-            <CopyBlock text="docker logs a-bot 2>&1 | grep 'Kod parowania'" />
+            <strong>{t('Read the pairing code')}</strong>
+            <CopyBlock text="docker logs a-bot 2>&1 | grep -i 'pairing code'" />
           </div>
         </li>
         <li>
           <div>
-            <strong>Wpisz kod</strong>
+            <strong>{t('Enter the code')}</strong>
             <form className="code-form" onSubmit={submit}>
               <input
                 className="input code-input"
@@ -314,13 +320,13 @@ docker compose -p a-bot up -d --build`;
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="ABC 123"
                 maxLength={8}
-                aria-label="Kod parowania"
+                aria-label={t('Pairing code')}
                 aria-invalid={Boolean(error)}
                 autoComplete="off"
                 spellCheck={false}
               />
               <button className="btn btn-primary" disabled={busy || normalizePairingCode(code).length < 6}>
-                {busy ? 'Paruję…' : 'Sparuj'}
+                {busy ? t('Pairing…') : t('Pair')}
               </button>
             </form>
             {error && (
@@ -332,8 +338,8 @@ docker compose -p a-bot up -d --build`;
         </li>
         <li>
           <div>
-            <strong>Zaloguj silniki (raz)</strong>
-            <p>W aplikacji desktopowej: Ustawienia → Konta modeli. Albo ręcznie na workerze. Logowanie zostaje w wolumenie kontenera, a Ollama na hoście jest wykrywana automatycznie.</p>
+            <strong>{t('Sign in the engines (once)')}</strong>
+            <p>{t('In the desktop app: Settings → Model accounts. Or by hand on the worker. Sign-ins stay in the container volume; Ollama on the host is found automatically.')}</p>
             <CopyBlock text={'docker exec -it a-bot claude auth login\ndocker exec -it a-bot codex login --device-auth'} />
           </div>
         </li>

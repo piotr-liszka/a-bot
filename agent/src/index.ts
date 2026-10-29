@@ -12,9 +12,9 @@ function printCode(code: string, name: string) {
   const spaced = `${code.slice(0, 3)} ${code.slice(3)}`;
   console.log('');
   console.log('  ┌──────────────────────────────────────────────┐');
-  console.log(`  │  Kod parowania:  ${spaced.padEnd(28)}│`);
-  console.log(`  │  Urządzenie:     ${name.slice(0, 28).padEnd(28)}│`);
-  console.log('  │  W aplikacji: Urządzenia → Dodaj urządzenie  │');
+  console.log(`  │  Pairing code:   ${spaced.padEnd(28)}│`);
+  console.log(`  │  Device:         ${name.slice(0, 28).padEnd(28)}│`);
+  console.log('  │  In the app: Settings → Devices → Pair       │');
   console.log('  └──────────────────────────────────────────────┘');
   console.log('');
 }
@@ -27,7 +27,7 @@ async function waitForPairing(db: Db, deviceId: string, cfg: AgentConfig): Promi
     if (data) return data;
     if (Date.now() - codeIssuedAt > 14 * 60 * 1000) {
       const { data: code, error } = await db.rpc('create_pairing', { p_device_name: cfg.deviceName, p_hostname: hostname() });
-      if (error) throw new Error(`Nie mogę utworzyć kodu parowania: ${error.message}`);
+      if (error) throw new Error(`Cannot create a pairing code: ${error.message}`);
       codeIssuedAt = Date.now();
       printCode(code as string, cfg.deviceName);
     }
@@ -39,11 +39,11 @@ async function run() {
   const cfg = loadConfig();
   const db = createBackend(cfg);
   const deviceId = await ensureSignedIn(db);
-  log.info(`a-bot agent ${AGENT_VERSION} · id urządzenia ${deviceId}`);
-  log.info(`katalog roboczy: ${cfg.workspace}`);
+  log.info(`a-bot agent ${AGENT_VERSION} · device id ${deviceId}`);
+  log.info(`workspace: ${cfg.workspace}`);
 
   let device = await waitForPairing(db, deviceId, cfg);
-  log.info(`sparowano jako „${device.name}”`);
+  log.info(`paired as "${device.name}"`);
 
   let providers = buildProviders(cfg.customProviders);
   const runner = new JobRunner(db, deviceId, () => providers, cfg.workspace, cfg.maxParallelJobs);
@@ -60,7 +60,7 @@ async function run() {
       const snapshot = JSON.stringify(infos);
       if (!force && snapshot === published) return;
       const ready = infos.filter((p) => p.installed && p.authenticated).map((p) => p.name);
-      log.info(`silniki gotowe: ${ready.join(', ') || 'brak'}`);
+      log.info(`engines ready: ${ready.join(', ') || 'none'}`);
       const { error } = await db.from('devices').update({ providers: infos }).eq('id', deviceId);
       if (!error) published = snapshot;
     } finally {
@@ -99,18 +99,18 @@ async function run() {
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'devices', filter: `id=eq.${deviceId}` }, (payload) => {
       const next = payload.new as DeviceRow;
       if (next.refresh_requested_at && next.refresh_requested_at !== device.refresh_requested_at) {
-        log.info('odświeżanie silników na prośbę aplikacji');
+        log.info('re-detecting engines on request from the app');
         publishProviders(true).catch((e) => log.warn(String(e)));
       }
       device = next;
     })
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'devices', filter: `id=eq.${deviceId}` }, () => {
-      log.warn('urządzenie zostało usunięte w aplikacji; zatrzymuję agenta');
+      log.warn('device was deleted in the app; stopping the agent');
       shutdown(0);
     })
     .subscribe((status, err) => {
       if (status === 'SUBSCRIBED') {
-        log.info('nasłuchuję wiadomości');
+        log.info('listening for messages');
         // Catch anything sent while we were offline or reconnecting.
         runner.pickUpPending().catch((e) => log.warn(String(e)));
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -158,7 +158,7 @@ async function detect() {
 const command = process.argv[2] ?? 'run';
 const main = command === 'detect' ? detect : command === 'run' ? run : undefined;
 if (!main) {
-  console.log('Użycie: a-bot-agent [run|detect]');
+  console.log('Usage: a-bot-agent [run|detect]');
   process.exit(1);
 }
 main().catch((err) => {

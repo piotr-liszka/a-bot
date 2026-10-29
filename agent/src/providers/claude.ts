@@ -59,7 +59,7 @@ export function createClaudeParser(emit: RunContext['emit']) {
           emit.step({ id: block.id, kind: d.kind, title: d.title, detail: d.detail, status: 'running' });
         }
         if (block.type === 'thinking' && block.thinking) {
-          emit.step({ id: `thinking-${ev.message?.id ?? Math.random()}`, kind: 'thinking', title: 'Myślenie', output: tail(block.thinking, 2000), status: 'done' });
+          emit.step({ id: `thinking-${ev.message?.id ?? Math.random()}`, kind: 'thinking', title: 'Thinking', output: tail(block.thinking, 2000), status: 'done' });
         }
       }
       return;
@@ -86,7 +86,7 @@ export function createClaudeParser(emit: RunContext['emit']) {
         outputTokens: ev.usage?.output_tokens,
         costUsd: ev.total_cost_usd,
       });
-      if (ev.is_error) state.error = typeof ev.result === 'string' && ev.result ? ev.result : (ev.subtype ?? 'Błąd Claude');
+      if (ev.is_error) state.error = typeof ev.result === 'string' && ev.result ? ev.result : (ev.subtype ?? 'Claude error');
     }
   };
   return { handle, state };
@@ -100,14 +100,14 @@ export const claudeProvider: Provider = {
       id: 'claude',
       kind: 'claude',
       name: 'Claude Code',
-      description: 'Agent Anthropic z dostępem do terminala, plików i przeglądarki w kontenerze.',
+      description: 'Anthropic’s agent with the terminal, files and browser of the container.',
       installed: false,
       authenticated: false,
       models: MODELS,
       defaultModel: 'sonnet',
     };
     if (!(await which('claude'))) {
-      info.setupHint = 'Zainstaluj: npm i -g @anthropic-ai/claude-code';
+      info.setupHint = 'Install: npm i -g @anthropic-ai/claude-code';
       return info;
     }
     info.installed = true;
@@ -119,7 +119,7 @@ export const claudeProvider: Provider = {
     } catch {
       info.authenticated = s.code === 0;
     }
-    if (!info.authenticated) info.setupHint = 'Zaloguj w Ustawienia → Konta modeli albo w kontenerze: claude auth login';
+    if (!info.authenticated) info.setupHint = 'Sign in under Settings → Model accounts, or in the container: claude auth login';
     return info;
   },
   async run(ctx) {
@@ -132,6 +132,6 @@ export const claudeProvider: Provider = {
     const res = await streamLines('claude', args, { cwd: ctx.cwd, signal: ctx.signal, env: { ...process.env, IS_SANDBOX: '1' }, onLine: parser.handle });
     if (ctx.signal.aborted) return;
     if (parser.state.error) throw new ProviderError(parser.state.error);
-    if (res.code !== 0 && !parser.state.sawResult) throw new ProviderError(tail(res.stderr.trim(), 1500) || `claude zakończył się kodem ${res.code}`);
+    if (res.code !== 0 && !parser.state.sawResult) throw new ProviderError(tail(res.stderr.trim(), 1500) || `claude exited with code ${res.code}`);
   },
 };

@@ -1,5 +1,6 @@
 import type { BackendConfig } from '@a-bot/shared';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { t } from './i18n';
 
 const STORAGE_KEY = 'a-bot.backend';
 
@@ -52,21 +53,21 @@ export async function probeBackend(cfg: BackendConfig): Promise<string | undefin
     const res = await fetch(`${cfg.url.replace(/\/$/, '')}/rest/v1/devices?select=id&limit=1`, {
       headers: { apikey: cfg.anonKey, Authorization: `Bearer ${cfg.anonKey}` },
     });
-    if (res.status === 401 || res.status === 403) return 'Serwer odrzucił klucz. Sprawdź klucz publiczny (anon/publishable).';
-    if (res.status === 404) return 'Serwer działa, ale nie ma schematu a-bot. Uruchom migracje z katalogu supabase/.';
-    if (!res.ok) return `Serwer odpowiedział błędem ${res.status}.`;
+    if (res.status === 401 || res.status === 403) return t('The server rejected the key. Check the public (anon/publishable) key.');
+    if (res.status === 404) return t('The server works but has no a-bot schema. Run the migrations from supabase/.');
+    if (!res.ok) return t('The server answered with error {status}.', { status: res.status });
     return undefined;
   } catch {
-    return 'Nie mogę połączyć się z tym adresem.';
+    return t('Cannot connect to this address.');
   }
 }
 
 export function friendlyError(err: { message?: string } | null | undefined): string {
-  const msg = err?.message ?? 'Coś poszło nie tak.';
-  if (/Invalid login credentials/i.test(msg)) return 'Nieprawidłowy e-mail lub hasło.';
-  if (/User already registered/i.test(msg)) return 'Konto z tym adresem już istnieje. Zaloguj się.';
-  if (/Password should be at least/i.test(msg)) return 'Hasło musi mieć co najmniej 6 znaków.';
-  if (/Email not confirmed/i.test(msg)) return 'Potwierdź adres e-mail linkiem z wiadomości, a potem się zaloguj.';
-  if (/Failed to fetch/i.test(msg)) return 'Brak połączenia z serwerem.';
-  return msg;
+  const msg = err?.message ?? t('Something went wrong.');
+  if (/Invalid login credentials/i.test(msg)) return t('Wrong email or password.');
+  if (/User already registered/i.test(msg)) return t('An account with this email already exists. Sign in.');
+  if (/Password should be at least/i.test(msg)) return t('The password needs at least 6 characters.');
+  if (/Email not confirmed/i.test(msg)) return t('Confirm your email with the link we sent, then sign in.');
+  if (/Failed to fetch/i.test(msg)) return t('No connection to the server.');
+  return t(msg);
 }
