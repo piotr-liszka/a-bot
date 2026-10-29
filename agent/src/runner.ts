@@ -32,7 +32,16 @@ export class JobRunner {
       .eq('status', 'streaming')
       .select('conversation_id');
     for (const row of data ?? []) {
-      await this.db.from('conversations').update({ busy: false, activity: null }).eq('id', row.conversation_id);
+      await this.updateConversation(row.conversation_id, { busy: false, activity: null });
+    }
+  }
+
+  /** Updates a conversation; on a database without the newer `activity` column, retries without it. */
+  private async updateConversation(id: string, patch: Record<string, unknown>): Promise<void> {
+    const { error } = await this.db.from('conversations').update(patch).eq('id', id);
+    if (error && 'activity' in patch && /activity/.test(error.message)) {
+      const { activity: _activity, ...rest } = patch;
+      if (Object.keys(rest).length) await this.db.from('conversations').update(rest).eq('id', id);
     }
   }
 
@@ -126,7 +135,7 @@ export class JobRunner {
       activity = current;
       flushing = flushing.then(async () => {
         await this.db.from('messages').update(patch).eq('id', message.id);
-        if (activityChanged) await this.db.from('conversations').update({ activity: current }).eq('id', conv.id);
+        if (activityChanged) await this.updateConversation(conv.id, { activity: current });
       });
       return flushing;
     };
@@ -189,10 +198,13 @@ export class JobRunner {
       .update({ text, steps, usage, status, error: errorText, finished_at: new Date().toISOString() })
       .eq('id', message.id);
     const preview = (text || errorText || '').replace(/^\s*\|?[\s:|-]+\|?\s*$/gm, '').replace(/`{3}\w*/g, '').replace(/[`*_#>|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120);
-    await this.db
-      .from('conversations')
-      .update({ busy: false, activity: null, provider_session_id: sessionId ?? null, updated_at: new Date().toISOString(), ...(preview ? { last_message_preview: preview } : {}) })
-      .eq('id', conv.id);
+    await this.updateConversation(conv.id, {
+      busy: false,
+      activity: null,
+      provider_session_id: sessionId ?? null,
+      updated_at: new Date().toISOString(),
+      ...(preview ? { last_message_preview: preview } : {}),
+    });
     log.info(`✓ ${status} (${text.length} chars, ${steps.length} steps)`);
   }
 }
