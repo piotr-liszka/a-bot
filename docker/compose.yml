@@ -1,5 +1,6 @@
 # The a-bot sandbox on one worker. The desktop app writes .env next to this file and runs
 #   docker compose -p a-bot up -d --build
+# Ollama running on the worker itself is reached through the ollama-relay service below.
 # You can do the same by hand: npm run box:pack, then copy dist/box to the worker.
 services:
   a-bot:
@@ -10,15 +11,33 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://${A_BOT_NET_PREFIX:-172.31.231}.1:11435}
     extra_hosts:
       - host.docker.internal:host-gateway
+    networks: [sandbox]
     ports:
       - 127.0.0.1:${A_BOT_DESKTOP_PORT:-6080}:6080
     volumes:
       - ${A_BOT_WORKSPACE_DIR:-./workspace}:/workspace
       - a-bot-home:/root
     shm_size: 1gb
+
+  # Ollama on the worker usually listens on 127.0.0.1 only, which a container cannot reach. This relay runs in
+  # the host network and exposes it on the sandbox network's gateway address only (not on the LAN).
+  ollama-relay:
+    image: alpine/socat:1.8.0.3
+    container_name: a-bot-ollama-relay
+    restart: unless-stopped
+    network_mode: host
+    command: TCP-LISTEN:11435,bind=${A_BOT_NET_PREFIX:-172.31.231}.1,reuseaddr,fork TCP:127.0.0.1:11434
+    depends_on: [a-bot]
+
+networks:
+  sandbox:
+    ipam:
+      config:
+        - subnet: ${A_BOT_NET_PREFIX:-172.31.231}.0/24
+          gateway: ${A_BOT_NET_PREFIX:-172.31.231}.1
 
 volumes:
   a-bot-home:
