@@ -1,4 +1,4 @@
-import type { MessageStep, ProviderInfo, ProviderKind } from '@a-bot/shared';
+import type { McpServer, MessageStep, ProviderInfo, ProviderKind } from '@a-bot/shared';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -23,6 +23,8 @@ export interface RunContext {
   /** Standing instructions from the bot definition. */
   instructions?: string;
   sessionId?: string;
+  /** MCP servers for this run, on top of the CLI's own configuration. */
+  mcpServers?: McpServer[];
   cwd: string;
   signal: AbortSignal;
   emit: RunEmitter;

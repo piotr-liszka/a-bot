@@ -1,0 +1,12 @@
+! Light terminals on the shared desktop.
+XTerm*faceName: DejaVu Sans Mono
+XTerm*faceSize: 11
+XTerm*background: #fbfbfd
+XTerm*foreground: #1d2130
+XTerm*cursorColor: #4a5ccf
+XTerm*internalBorder: 10
+XTerm*scrollBar: false
+XTerm*saveLines: 10000
+XTerm*selectToClipboard: true
+XTerm*geometry: 110x32
+Xcursor.theme: Adwaita

@@ -1,6 +1,7 @@
-import { upsertStep, type BotRow, type ConversationRow, type MessageRow, type MessageStep, type MessageUsage } from '@a-bot/shared';
+import { upsertStep, type BotRow, type McpServer, type ConversationRow, type MessageRow, type MessageStep, type MessageUsage } from '@a-bot/shared';
 import type { Db } from './backend.js';
 import { log } from './log.js';
+import { memoryInstructions, prepareMemory, publishMemory } from './memory.js';
 import { ProviderError, type ChatTurn, type Provider } from './providers/index.js';
 
 const FLUSH_MS = 350;
@@ -34,6 +35,13 @@ export class JobRunner {
     for (const row of data ?? []) {
       await this.updateConversation(row.conversation_id, { busy: false, activity: null });
     }
+  }
+
+  /** The a-bot MCP server (list_bots, ask_bot): this same agent binary in `mcp` mode. */
+  private builtinMcp(botId: string): McpServer {
+    // In development the agent runs under `--import tsx`; the CLI starts the server in the workspace, so resolve the loader.
+    const execArgv = process.execArgv.map((a, i, all) => (all[i - 1] === '--import' && !a.includes('/') ? import.meta.resolve(a) : a));
+    return { name: 'a-bot', command: process.execPath, args: [...execArgv, process.argv[1], 'mcp', '--bot', botId] };
   }
 
   /** Updates a conversation; on a database without the newer `activity` column, retries without it. */
@@ -148,6 +156,17 @@ export class JobRunner {
     }
     const provider = this.providers().get(conv.provider_id);
     const model = message.model ?? conv.model ?? bot?.model ?? undefined;
+    const tools = provider?.kind === 'claude' || provider?.kind === 'codex';
+    let memory: { path: string; text: string } | undefined;
+    if (bot) {
+      try {
+        memory = prepareMemory(this.workspace, bot);
+      } catch (err) {
+        log.warn(`memory of ${bot.name}: ${String(err)}`);
+      }
+    }
+    const instructions = [bot?.instructions, memory && memoryInstructions(memory.path, memory.text, tools)].filter(Boolean).join('\n\n') || undefined;
+    const mcpServers = bot && tools ? [...(bot.mcp ?? []), this.builtinMcp(bot.id)] : undefined;
     log.info(`→ ${conv.provider_id}${model ? `/${model}` : ''} in "${conv.title}"`);
     let status: MessageRow['status'] = 'done';
     let errorText: string | null = null;
@@ -158,7 +177,8 @@ export class JobRunner {
         prompt: lastUser.text,
         history,
         model,
-        instructions: bot?.instructions ?? undefined,
+        instructions,
+        mcpServers,
         sessionId,
         cwd: this.workspace,
         signal: ctl.signal,
@@ -191,6 +211,7 @@ export class JobRunner {
     } finally {
       clearInterval(timer);
     }
+    if (bot && memory) await publishMemory(this.db, this.workspace, bot, memory.text);
     steps = steps.map((s) => (s.status === 'running' ? { ...s, status: status === 'done' ? 'done' : 'error' } : s));
     await flushing;
     await this.db

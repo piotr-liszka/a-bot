@@ -1,11 +1,12 @@
 import { isDeviceOnline, type BotRow, type ConversationRow, type DeviceRow } from '@a-bot/shared';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useBots, useConversations, useDevices, useNow } from '../lib/data';
 import { bridge } from '../lib/desktopApi';
 import { engineOf } from '../lib/format';
 import { useAutoUpdate, useWorkers } from '../lib/workers';
 import { BotEditor } from './BotEditor';
+import { BotTabs, MemoryPanel, RoutinesPanel, type BotTab } from './BotPanels';
 import { Chat } from './Chat';
 import { DesktopView } from './DesktopView';
 import { DevicesPage } from './DevicesPage';
@@ -55,7 +56,7 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
   const workers = useWorkers();
   const [view, setView] = useState<View>('chat');
   const [section, setSection] = useState<SettingsSection>('devices');
-  const [editing, setEditing] = useState<string>('new');
+  const [editing, setEditing] = useState<{ id: string; tab: BotTab }>({ id: 'new', tab: 'settings' });
   const [deviceId, setDeviceId] = useState<string | undefined>(() => remembered('device'));
   const [botId, setBotId] = useState<string | undefined>(() => remembered('bot'));
   const [visited, setVisited] = useState({ desktop: false, terminal: false });
@@ -76,6 +77,18 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
   const busyBots = useMemo(() => new Set(conversations.rows.filter((c) => c.busy && c.bot_id).map((c) => c.bot_id!)), [conversations.rows]);
   const busyDevices = useMemo(() => new Set(conversations.loading ? devices.rows.map((d) => d.id) : conversations.rows.filter((c) => c.busy).map((c) => c.device_id)), [conversations, devices.rows]);
   const updates = useAutoUpdate(workers.workers, busyDevices);
+  // Tell the person when a bot finishes while they are looking elsewhere.
+  const wasBusy = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const prev = wasBusy.current;
+    wasBusy.current = new Set(conversations.rows.filter((c) => c.busy).map((c) => c.id));
+    if (document.hasFocus() || typeof Notification === 'undefined') return;
+    for (const c of conversations.rows) {
+      if (c.busy || !prev.has(c.id)) continue;
+      const b = bots.rows.find((x) => x.id === c.bot_id);
+      if (b) new Notification(b.name, { body: c.last_message_preview ?? '', silent: false });
+    }
+  }, [conversations.rows, bots.rows]);
   // One bot, one chat: the newest conversation is the chat; clearing it starts a new one.
   const conversation: ConversationRow | undefined = botConversations[0];
 
@@ -96,13 +109,14 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
     setSection(s);
     setView('settings');
   };
-  const editBot = (id: string) => {
-    setEditing(id);
+  const editBot = (id: string, tab: BotTab = 'settings') => {
+    setEditing({ id, tab });
     setView('bot');
   };
 
   const fullWidth = effectiveView !== 'settings';
-  const editedBot = editing === 'new' ? undefined : bots.rows.find((b) => b.id === editing);
+  const editedBot = editing.id === 'new' ? undefined : bots.rows.find((b) => b.id === editing.id);
+  const tabs = editedBot && <BotTabs tab={editing.tab} onSelect={(tab) => setEditing({ id: editedBot.id, tab })} />;
 
   let main: ReactNode = null;
   if (effectiveView === 'settings') {
@@ -128,10 +142,14 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
     else if (device && !worker) main = <NeedsWorker db={db} device={device} view="terminal" onLinked={workers.reload} />;
   } else if (effectiveView === 'desktop') {
     if (device && !worker) main = <NeedsWorker db={db} device={device} view="desktop" onLinked={workers.reload} />;
+  } else if (device && effectiveView === 'bot' && !needsFirstBot && editedBot && editing.tab === 'memory') {
+    main = <MemoryPanel key={editedBot.id} db={db} bot={editedBot} tabs={tabs} now={now} />;
+  } else if (device && effectiveView === 'bot' && !needsFirstBot && editedBot && editing.tab === 'routines') {
+    main = <RoutinesPanel key={editedBot.id} db={db} bot={editedBot} tabs={tabs} now={now} />;
   } else if (device && (effectiveView === 'bot' || needsFirstBot)) {
     main = (
       <BotEditor
-        key={needsFirstBot ? 'first' : editing}
+        key={needsFirstBot ? 'first' : editing.id}
         db={db}
         device={device}
         bot={needsFirstBot ? undefined : editedBot}
@@ -147,6 +165,7 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
         }}
         onCancel={needsFirstBot ? undefined : () => setView('chat')}
         onOpenAccounts={() => openSettings('accounts')}
+        tabs={needsFirstBot ? undefined : tabs}
       />
     );
   } else if (device && bot) {
@@ -161,7 +180,8 @@ export function Workspace({ db, session, onChangeBackend }: Props) {
           conversation={conversation}
           loading={conversations.loading}
           onCleared={conversations.drop}
-          onEditBot={() => editBot(bot.id)}
+          onEditBot={(tab) => editBot(bot.id, tab)}
+          onOpenScreen={bridge() ? () => setView('desktop') : undefined}
           onOpenAccounts={() => openSettings('accounts')}
         />
     );

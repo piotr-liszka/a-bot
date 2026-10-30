@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=a-bot terminal (same session as the app)
+Exec=xterm -T a-bot -e tmux new-session -A -s main
+Icon=/usr/share/a-bot/desktop/a-bot.svg

@@ -4,6 +4,9 @@ import { createBackend, ensureSignedIn, type Db } from './backend.js';
 import { AGENT_VERSION, loadConfig, type AgentConfig } from './config.js';
 import { log } from './log.js';
 import { buildProviders, detectAll } from './providers/index.js';
+import { startBridge } from './bridge.js';
+import { serveMcp } from './mcp.js';
+import { tickRoutines } from './routines.js';
 import { JobRunner } from './runner.js';
 
 const PAIR_POLL_MS = 3000;
@@ -86,6 +89,7 @@ async function run() {
   await heartbeat();
   await publishProviders(true);
   await runner.recoverInterrupted();
+  const bridge = startBridge(db, deviceId);
 
   const channel = db
     .channel(`device-${deviceId}`)
@@ -123,7 +127,9 @@ async function run() {
   const poll = setInterval(() => {
     runner.pickUpPending().catch(() => {});
     publishProviders().catch(() => {});
+    tickRoutines(db, deviceId).catch((e) => log.warn(`routines: ${String(e)}`));
   }, 30_000);
+  tickRoutines(db, deviceId).catch(() => {});
 
   let stopping = false;
   async function shutdown(code: number) {
@@ -131,6 +137,7 @@ async function run() {
     stopping = true;
     clearInterval(beat);
     clearInterval(poll);
+    bridge.close();
     runner.cancelAll();
     await heartbeat('offline').catch(() => {});
     await db.removeChannel(channel).catch(() => {});
@@ -150,15 +157,16 @@ async function detect() {
   })();
   const infos = await detectAll(buildProviders(cfg?.customProviders));
   for (const p of infos) {
-    const state = !p.installed ? 'brak' : p.authenticated ? 'gotowy' : 'niezalogowany';
+    const state = !p.installed ? 'missing' : p.authenticated ? 'ready' : 'signed out';
     console.log(`${p.name.padEnd(14)} ${state.padEnd(14)} ${p.version ?? ''}${p.setupHint ? `\n${' '.repeat(15)}${p.setupHint}` : ''}`);
   }
 }
 
 const command = process.argv[2] ?? 'run';
-const main = command === 'detect' ? detect : command === 'run' ? run : undefined;
+const botArg = process.argv.indexOf('--bot');
+const main = command === 'detect' ? detect : command === 'run' ? run : command === 'mcp' && botArg > 0 ? () => serveMcp(process.argv[botArg + 1]) : undefined;
 if (!main) {
-  console.log('Usage: a-bot-agent [run|detect]');
+  console.log('Usage: a-bot-agent [run|detect|mcp --bot <id>]');
   process.exit(1);
 }
 main().catch((err) => {

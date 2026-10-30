@@ -16,8 +16,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       jq ripgrep unzip zip xz-utils build-essential python3 python3-pip python3-venv \
       chromium fonts-liberation fonts-dejavu-core fonts-noto-color-emoji \
       tigervnc-standalone-server tigervnc-tools websockify openbox xterm x11-xserver-utils \
+      tint2 hsetroot pcmanfm arc-theme papirus-icon-theme adwaita-icon-theme \
       supervisor tini tmux \
     && rm -rf /var/lib/apt/lists/*
+
+# Google Chrome on amd64 (Google ships no arm64 build); the browser script falls back to Chromium.
+RUN if [ "$(dpkg --print-architecture)" = amd64 ]; then \
+      curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+      && apt-get update && apt-get install -y --no-install-recommends /tmp/chrome.deb \
+      && rm -rf /tmp/chrome.deb /var/lib/apt/lists/* /etc/apt/sources.list.d/google-chrome*; \
+    fi
 
 # Bots. Log in once from the app's Terminal tab (claude auth login / codex login);
 # credentials stay in the a-bot-home volume.
@@ -35,6 +43,8 @@ COPY browser.sh /usr/local/bin/browser
 COPY supervisord.conf /etc/supervisor/conf.d/a-bot.conf
 COPY openbox-menu.xml /etc/xdg/openbox/menu.xml
 COPY openbox-autostart.sh /etc/xdg/openbox/autostart
+COPY desktop /usr/share/a-bot/desktop
+COPY desktop/gtk-settings.ini /etc/gtk-3.0/settings.ini
 COPY tmux.conf /etc/tmux.conf
 RUN chmod +x /usr/local/bin/a-bot-entrypoint /usr/local/bin/browser
 

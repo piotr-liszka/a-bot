@@ -1,6 +1,6 @@
 import type { BotRow, ConversationRow, DeviceRow, MessageRow, ProviderInfo } from '@a-bot/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { Eraser, Pencil } from 'lucide-react';
+import { Brain, Clock, Eraser, Monitor, Pencil } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { friendlyError } from '../lib/backend';
 import { useMessages } from '../lib/data';
@@ -10,6 +10,7 @@ import { iconState } from '../lib/botIcon';
 import { Composer } from './Composer';
 import { Message } from './Message';
 import { t } from '../lib/i18n';
+import type { BotTab } from './BotPanels';
 
 interface Props {
   db: SupabaseClient;
@@ -22,13 +23,15 @@ interface Props {
   conversation?: ConversationRow;
   loading: boolean;
   onCleared: (conversationId: string) => void;
-  onEditBot: () => void;
+  onEditBot: (tab?: BotTab) => void;
+  /** Opens the worker's desktop, when this app can reach it. */
+  onOpenScreen?: () => void;
   onOpenAccounts: () => void;
 }
 
 const SUGGESTIONS = ['What is in /workspace?', 'Open the browser and check the weather in Kraków', 'Install ffmpeg and show its version'];
 
-export function Chat({ db, device, online, bot, engine, conversation, loading, onCleared, onEditBot, onOpenAccounts }: Props) {
+export function Chat({ db, device, online, bot, engine, conversation, loading, onCleared, onEditBot, onOpenScreen, onOpenAccounts }: Props) {
   const messages = useMessages(db, conversation?.id);
   const [sendError, setSendError] = useState<string>();
   const [confirmClear, setConfirmClear] = useState(false);
@@ -110,7 +113,7 @@ export function Chat({ db, device, online, bot, engine, conversation, loading, o
               })
             : t('Engine “{engine}” is not available on “{device}”.', { engine: bot.engine, device: device.name }),
           hint: engine && (engine.kind === 'claude' || engine.kind === 'codex') ? undefined : engine?.setupHint && t(engine.setupHint),
-          action: engine?.kind === 'claude' || engine?.kind === 'codex' ? { label: t('Sign in under Settings'), onClick: onOpenAccounts } : { label: t('Edit bot'), onClick: onEditBot },
+          action: engine?.kind === 'claude' || engine?.kind === 'codex' ? { label: t('Sign in under Settings'), onClick: onOpenAccounts } : { label: t('Edit bot'), onClick: () => onEditBot() },
           hard: true,
         }
       : !online
@@ -136,7 +139,18 @@ export function Chat({ db, device, online, bot, engine, conversation, loading, o
             )}
           </span>
         </div>
-        <button className="icon-btn" onClick={onEditBot} title={t('Edit bot')} aria-label={t('Edit bot')}>
+        {onOpenScreen && (
+          <button className="icon-btn" onClick={onOpenScreen} title={t('Screen')} aria-label={t('Screen')}>
+            <Monitor size={16} />
+          </button>
+        )}
+        <button className="icon-btn" onClick={() => onEditBot('memory')} title={t('Memory')} aria-label={t('Memory')}>
+          <Brain size={16} />
+        </button>
+        <button className="icon-btn" onClick={() => onEditBot('routines')} title={t('Routines')} aria-label={t('Routines')}>
+          <Clock size={16} />
+        </button>
+        <button className="icon-btn" onClick={() => onEditBot()} title={t('Edit bot')} aria-label={t('Edit bot')}>
           <Pencil size={15} />
         </button>
         {conversation &&

@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Files (/workspace)
+Exec=pcmanfm /workspace
+Icon=system-file-manager

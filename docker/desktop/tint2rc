@@ -1,0 +1,85 @@
+# a-bot dock: a light, floating bar at the bottom of the shared desktop.
+# Backgrounds: 1 dock, 2 task, 3 active task
+rounded = 16
+border_width = 1
+border_sides = TBLR
+background_color = #ffffff 88
+border_color = #1d2130 14
+
+rounded = 10
+border_width = 0
+background_color = #ffffff 0
+border_color = #ffffff 0
+background_color_hover = #1d2130 8
+border_color_hover = #ffffff 0
+
+rounded = 10
+border_width = 0
+background_color = #4a5ccf 16
+border_color = #ffffff 0
+background_color_hover = #4a5ccf 22
+border_color_hover = #ffffff 0
+
+panel_items = LTSC
+panel_monitor = all
+panel_position = bottom center horizontal
+panel_size = 100% 60
+panel_shrink = 1
+panel_margin = 0 10
+panel_padding = 10 8 8
+panel_background_id = 1
+panel_layer = top
+panel_dock = 0
+wm_menu = 1
+strut_policy = follow_size
+autohide = 0
+font_shadow = 0
+
+launcher_padding = 2 0 8
+launcher_background_id = 0
+launcher_icon_size = 40
+launcher_icon_theme = Papirus
+launcher_icon_theme_override = 0
+launcher_tooltip = 1
+startup_notifications = 1
+launcher_item_app = /usr/share/a-bot/desktop/browser.desktop
+launcher_item_app = /usr/share/a-bot/desktop/a-bot.desktop
+launcher_item_app = /usr/share/a-bot/desktop/terminal.desktop
+launcher_item_app = /usr/share/a-bot/desktop/files.desktop
+
+taskbar_mode = single_desktop
+taskbar_padding = 6 0 6
+taskbar_background_id = 0
+taskbar_name = 0
+task_text = 0
+task_icon = 1
+task_centered = 1
+task_maximum_size = 48 48
+task_padding = 4 4 0
+task_background_id = 2
+task_active_background_id = 3
+task_urgent_background_id = 3
+task_iconified_background_id = 2
+task_tooltip = 1
+mouse_left = toggle_iconify
+mouse_middle = close
+mouse_right = none
+
+systray_padding = 4 0 6
+systray_background_id = 0
+systray_icon_size = 22
+
+time1_format = %H:%M
+time2_format = %a %d %b
+time1_font = DejaVu Sans Bold 10
+time2_font = DejaVu Sans 8
+clock_font_color = #1d2130 90
+clock_padding = 8 0
+clock_background_id = 0
+
+tooltip_show_timeout = 0.4
+tooltip_hide_timeout = 0.1
+tooltip_padding = 8 6
+tooltip_background_id = 1
+tooltip_font_color = #1d2130 100
+tooltip_font = DejaVu Sans 9

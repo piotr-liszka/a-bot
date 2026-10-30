@@ -1,4 +1,4 @@
-import type { ProviderInfo } from '@a-bot/shared';
+import type { McpServer, ProviderInfo } from '@a-bot/shared';
 import { exec, streamLines, tail, which } from '../proc.js';
 import { ProviderError, type Provider, type RunContext } from './types.js';
 
@@ -77,6 +77,25 @@ export function createCodexParser(emit: RunContext['emit']) {
   return { handle, state };
 }
 
+const toml = (v: unknown) => JSON.stringify(v);
+const tomlTable = (o: Record<string, string>) => `{${Object.entries(o).map(([k, v]) => `${toml(k)} = ${toml(v)}`).join(', ')}}`;
+
+/** MCP servers as `codex -c mcp_servers.<name>.…=…` overrides (values are TOML). */
+export function codexMcpOverrides(servers: McpServer[]): string[] {
+  const out: string[] = [];
+  for (const s of servers) {
+    const key = `mcp_servers.${s.name.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+    if ('url' in s) {
+      out.push('-c', `${key}.url=${toml(s.url)}`);
+      if (s.headers && Object.keys(s.headers).length) out.push('-c', `${key}.http_headers=${tomlTable(s.headers)}`);
+    } else {
+      out.push('-c', `${key}.command=${toml(s.command)}`, '-c', `${key}.args=${toml(s.args ?? [])}`);
+      if (s.env && Object.keys(s.env).length) out.push('-c', `${key}.env=${tomlTable(s.env)}`);
+    }
+  }
+  return out;
+}
+
 export const codexProvider: Provider = {
   id: 'codex',
   kind: 'codex',
@@ -107,7 +126,7 @@ export const codexProvider: Provider = {
     if (ctx.model) common.push('--model', ctx.model);
     // Codex has no per-run system prompt flag; the bot's instructions open the session instead.
     const prompt = !ctx.sessionId && ctx.instructions ? `${ctx.instructions}\n\n---\n\n${ctx.prompt}` : ctx.prompt;
-    const args = ctx.sessionId ? ['exec', 'resume', ...common, ctx.sessionId, prompt] : ['exec', ...common, prompt];
+    const args = [...codexMcpOverrides(ctx.mcpServers ?? []), ...(ctx.sessionId ? ['exec', 'resume', ...common, ctx.sessionId, prompt] : ['exec', ...common, prompt])];
     const parser = createCodexParser(ctx.emit);
     const res = await streamLines('codex', args, { cwd: ctx.cwd, signal: ctx.signal, onLine: parser.handle });
     if (ctx.signal.aborted) return;

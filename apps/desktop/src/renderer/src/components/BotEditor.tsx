@@ -1,9 +1,10 @@
-import type { BotRow, DeviceRow } from '@a-bot/shared';
+import type { BotRow, DeviceRow, McpServer } from '@a-bot/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { friendlyError } from '../lib/backend';
 import { botHue, botState } from '../lib/format';
 import { BotAvatar } from './BotAvatar';
+import { McpEditor } from './McpEditor';
 import { t } from '../lib/i18n';
 
 const CUSTOM = '__custom__';
@@ -28,9 +29,11 @@ interface Props {
   onDeleted?: (id: string) => void;
   onCancel?: () => void;
   onOpenAccounts: () => void;
+  /** Memory / Routines tabs, shown for an existing bot. */
+  tabs?: ReactNode;
 }
 
-export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel, onOpenAccounts }: Props) {
+export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel, onOpenAccounts, tabs }: Props) {
   const engines = device.providers;
   const firstReady = engines.find((p) => botState(p).tone === 'on') ?? engines[0];
   const [name, setName] = useState(bot?.name ?? '');
@@ -39,6 +42,7 @@ export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel
   const [customModel, setCustomModel] = useState(false);
   const [instructions, setInstructions] = useState(bot?.instructions ?? '');
   const [color, setColor] = useState<string | null>(bot?.color ?? null);
+  const [mcp, setMcp] = useState<McpServer[]>(bot?.mcp ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -60,6 +64,7 @@ export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel
       model: model.trim() || null,
       instructions: instructions.trim() || null,
       color,
+      mcp: mcp.filter((m) => m.name.trim() && ('url' in m ? m.url.trim() : m.command.trim())),
       updated_at: new Date().toISOString(),
     };
     const query = bot ? db.from('bots').update(values).eq('id', bot.id) : db.from('bots').insert(values);
@@ -86,6 +91,7 @@ export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel
             <BotAvatar bot={{ name: name || '?', kind: engine?.kind, color }} size="lg" />
             <h1>{bot ? t('Edit “{bot}”', { bot: bot.name }) : first ? t('Create your first bot') : t('New bot')}</h1>
           </div>
+          {tabs}
           {!bot && (
             <p className="page-lede">
               {t('A bot is your assistant with a name and instructions. It runs on one of the engines found on “{device}” (Claude Code, Codex, Ollama…) and can use the sandbox: terminal, browser and /workspace.', { device: device.name })}
@@ -165,6 +171,7 @@ export function BotEditor({ db, device, bot, first, onSaved, onDeleted, onCancel
                   placeholder={t('Who this bot is and how it should work, e.g. “Answer briefly. Commit before changing files in /workspace.”')}
                 />
               </label>
+              <McpEditor value={mcp} onChange={setMcp} />
               <div className="field">
                 <span>{t('Color')}</span>
                 <div className="swatches" role="radiogroup" aria-label={t('Color')}>

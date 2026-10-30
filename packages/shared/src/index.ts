@@ -43,8 +43,71 @@ export interface BotRow {
   model: string | null;
   instructions: string | null;
   color: string | null;
+  /** The bot's MEMORY.md, mirrored by the agent. */
+  memory: string;
+  memory_updated_at: string | null;
+  /** Extra MCP servers for this bot. */
+  mcp: McpServer[];
   created_at: string;
   updated_at: string;
+}
+
+/** An MCP server: a command run in the sandbox, or a remote URL. */
+export type McpServer =
+  | { name: string; command: string; args?: string[]; env?: Record<string, string> }
+  | { name: string; url: string; headers?: Record<string, string> };
+
+export type RoutineSchedule =
+  | { kind: 'interval'; minutes: number }
+  /** days: 0 = Sunday … 6 = Saturday; empty or missing means every day. */
+  | { kind: 'daily'; time: string; days?: number[] };
+
+export interface RoutineRow {
+  id: string;
+  owner_id: string;
+  bot_id: string;
+  device_id: string;
+  name: string;
+  prompt: string;
+  schedule: RoutineSchedule;
+  timezone: string;
+  enabled: boolean;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  last_status: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** UTC offset of `timeZone` at `date`, in minutes (e.g. 60 for Warsaw in winter). */
+function zoneOffset(date: Date, timeZone: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      .formatToParts(date)
+      .map((p) => [p.type, p.value]),
+  );
+  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+  return Math.round((asUtc - date.getTime()) / 60_000);
+}
+
+/** The first moment after `after` at which the routine is due. */
+export function nextRun(schedule: RoutineSchedule, timeZone: string, after: Date = new Date()): Date {
+  if (schedule.kind === 'interval') return new Date(after.getTime() + Math.max(5, schedule.minutes) * 60_000);
+  const [h, m] = schedule.time.split(':').map(Number);
+  const days = schedule.days?.length ? schedule.days : [0, 1, 2, 3, 4, 5, 6];
+  // Walk local calendar days in the routine's time zone until one matches and lies in the future.
+  const local = new Date(after.getTime() + zoneOffset(after, timeZone) * 60_000);
+  for (let i = 0; i < 8; i++) {
+    const y = local.getUTCFullYear();
+    const mo = local.getUTCMonth();
+    const d = local.getUTCDate() + i;
+    const guess = Date.UTC(y, mo, d, h, m);
+    const weekday = new Date(guess).getUTCDay();
+    if (!days.includes(weekday)) continue;
+    const at = new Date(guess - zoneOffset(new Date(guess), timeZone) * 60_000);
+    if (at.getTime() > after.getTime()) return at;
+  }
+  return new Date(after.getTime() + 24 * 3_600_000);
 }
 
 export interface ConversationRow {

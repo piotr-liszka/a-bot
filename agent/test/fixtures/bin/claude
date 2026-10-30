@@ -16,7 +16,51 @@ const prompt = args[args.indexOf('-p') + 1] ?? '';
 const instructions = args.includes('--append-system-prompt') ? args[args.indexOf('--append-system-prompt') + 1] : '';
 const words = (text) => text.split(/(?<= )/);
 
+const mcpConfig = args.includes('--mcp-config') ? JSON.parse(args[args.indexOf('--mcp-config') + 1]) : undefined;
+
+/** Plays a short answer without tools. */
+function reply(text) {
+  out({ type: 'system', subtype: 'init', session_id: 'fake-session-1', model: 'sonnet' });
+  out({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text } } });
+  out({ type: 'result', subtype: 'success', is_error: false, result: text, session_id: 'fake-session-1' });
+}
+
+/** Calls a tool of the a-bot MCP server the agent configured, like Claude Code would. */
+function callMcpTool(name, args) {
+  const { spawn } = process.getBuiltinModule('node:child_process');
+  const server = mcpConfig.mcpServers['a-bot'];
+  const child = spawn(server.command, server.args, { env: { ...process.env, ...server.env }, stdio: ['pipe', 'pipe', 'inherit'] });
+  const send = (m) => child.stdin.write(JSON.stringify({ jsonrpc: '2.0', ...m }) + '\n');
+  return new Promise((resolve, reject) => {
+    let buf = '';
+    child.stdout.on('data', (d) => {
+      buf += d;
+      for (const line of buf.split('\n').slice(0, -1)) {
+        const msg = JSON.parse(line);
+        if (msg.id === 1) send({ id: 2, method: 'tools/call', params: { name, arguments: args } });
+        if (msg.id === 2) {
+          child.kill();
+          resolve(msg.result.content[0].text);
+        }
+      }
+      buf = buf.slice(buf.lastIndexOf('\n') + 1);
+    });
+    child.on('error', reject);
+    child.on('exit', (code) => reject(new Error(`a-bot MCP server exited with ${code}`)));
+    send({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } });
+  });
+}
+
 (async () => {
+  const remember = prompt.match(/REMEMBER: (.+)/);
+  if (remember) {
+    const path = instructions.match(/memory file at (\S+)\./)[1];
+    process.getBuiltinModule('node:fs').appendFileSync(path, `- ${remember[1]}\n`);
+    return reply('Zapamiętane.');
+  }
+  const ask = prompt.match(/ASK (\w+): (.+)/);
+  if (ask) return reply(`Odpowiedź od ${ask[1]}: ${await callMcpTool('ask_bot', { bot: ask[1], message: ask[2] })}`);
+  if (prompt.startsWith('💬')) return reply(`Pong: ${prompt.split('\n').pop()}`);
   if (prompt.includes('SLEEP')) await sleep(30_000);
   out({ type: 'system', subtype: 'init', session_id: 'fake-session-1', model: 'sonnet' });
   out({ type: 'stream_event', event: { type: 'message_start' } });

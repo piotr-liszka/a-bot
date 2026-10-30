@@ -1,4 +1,4 @@
-import type { ProviderInfo } from '@a-bot/shared';
+import type { McpServer, ProviderInfo } from '@a-bot/shared';
 import { exec, streamLines, tail, which } from '../proc.js';
 import { ProviderError, type Provider, type RunContext } from './types.js';
 
@@ -14,6 +14,15 @@ export function describeToolUse(name: string, input: Record<string, unknown>): {
   if (name === 'WebSearch') return { kind: 'tool', title: `WebSearch ${str('query') ?? ''}`.trim() };
   if (name === 'Grep' || name === 'Glob') return { kind: 'tool', title: `${name} ${str('pattern') ?? ''}`.trim() };
   return { kind: 'tool', title: name, detail: JSON.stringify(input).slice(0, 400) };
+}
+
+/** MCP servers in Claude Code's --mcp-config format. */
+export function claudeMcpConfig(servers: McpServer[]): { mcpServers: Record<string, unknown> } {
+  return {
+    mcpServers: Object.fromEntries(
+      servers.map((s) => [s.name, 'url' in s ? { type: 'http', url: s.url, headers: s.headers } : { command: s.command, args: s.args ?? [], env: s.env ?? {} }]),
+    ),
+  };
 }
 
 function toolResultText(content: unknown): string {
@@ -127,6 +136,7 @@ export const claudeProvider: Provider = {
     if (ctx.model) args.push('--model', ctx.model);
     if (ctx.instructions) args.push('--append-system-prompt', ctx.instructions);
     if (ctx.sessionId) args.push('--resume', ctx.sessionId);
+    if (ctx.mcpServers?.length) args.push('--mcp-config', JSON.stringify(claudeMcpConfig(ctx.mcpServers)));
     const parser = createClaudeParser(ctx.emit);
     // IS_SANDBOX lets Claude Code skip permission prompts while running as root inside the container.
     const res = await streamLines('claude', args, { cwd: ctx.cwd, signal: ctx.signal, env: { ...process.env, IS_SANDBOX: '1' }, onLine: parser.handle });

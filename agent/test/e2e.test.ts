@@ -1,10 +1,10 @@
 // End-to-end test against a local Supabase (npm run db:start at the repo root).
 // Starts a real agent process, pairs it, chats with the Terminal bot and checks access rules.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { DeviceRow, MessageRow } from '@a-bot/shared';
+import type { BotRow, DeviceRow, MessageRow, RoutineRow } from '@a-bot/shared';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
@@ -33,11 +33,12 @@ async function waitFor<T>(fn: () => Promise<T | undefined>, timeoutMs = 20_000):
 
 let agent: ChildProcess;
 let agentOut = '';
+let workspace = '';
 
 before(() => {
   if (!KEY) return;
   const home = mkdtempSync(join(tmpdir(), 'a-bot-agent-'));
-  const workspace = mkdtempSync(join(tmpdir(), 'a-bot-ws-'));
+  workspace = mkdtempSync(join(tmpdir(), 'a-bot-ws-'));
   agent = spawn(process.execPath, ['--import', 'tsx', 'src/index.ts', 'run'], {
     env: { ...process.env, PATH: `${join(process.cwd(), 'test/fixtures/bin')}:${process.env.PATH}`, A_BOT_HOME: home, A_BOT_WORKSPACE: workspace, A_BOT_DEVICE_NAME: 'Test box', A_BOT_SUPABASE_URL: URL, A_BOT_SUPABASE_ANON_KEY: KEY },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -115,6 +116,53 @@ test('pair a device, chat with a bot, cancel, and keep strangers out', { skip: !
   }, 10_000);
   assert.equal(cancelled.status, 'cancelled');
 
+  const ask = async (convId: string, text: string) => {
+    const { data: m, error } = await me.rpc('send_message', { p_conversation_id: convId, p_text: text }).single<MessageRow>();
+    assert.ifError(error);
+    return waitFor(async () => {
+      const { data } = await me.from('messages').select('*').eq('id', m.id).single<MessageRow>();
+      return data && ['done', 'error'].includes(data.status) ? data : undefined;
+    });
+  };
+
+  // Memory: the bot writes MEMORY.md in the sandbox, the agent mirrors it into the database.
+  const remembered = await ask(conv.id, 'REMEMBER: Piotr lubi krótkie odpowiedzi');
+  assert.equal(remembered.status, 'done', remembered.error ?? agentOut);
+  const file = readFileSync(join(workspace, '.a-bot', 'bots', bot.id, 'MEMORY.md'), 'utf8');
+  assert.match(file, /Piotr lubi krótkie odpowiedzi/);
+  const { data: botAfter } = await me.from('bots').select('*').eq('id', bot.id).single<BotRow>();
+  assert.match(botAfter!.memory, /Piotr lubi krótkie odpowiedzi/);
+  // Editing it in the app reaches the file before the next run.
+  await me.from('bots').update({ memory: '# Edited in the app\n', memory_updated_at: new Date(Date.now() + 1000).toISOString() }).eq('id', bot.id);
+  await ask(conv.id, 'REMEMBER: drugi fakt');
+  assert.match(readFileSync(join(workspace, '.a-bot', 'bots', bot.id, 'MEMORY.md'), 'utf8'), /^# Edited in the app\n- drugi fakt/);
+
+  // Bot to bot: Asystent asks Kolega through the a-bot MCP tools; the exchange lands in Kolega's chat.
+  const { data: friend } = await me.from('bots').insert({ device_id: device.id, name: 'Kolega', engine: 'claude' }).select().single<BotRow>();
+  const asked = await ask(conv.id, 'ASK Kolega: ping 42');
+  assert.equal(asked.status, 'done', asked.error ?? agentOut);
+  assert.match(asked.text, /Odpowiedź od Kolega: .*Pong: ping 42/s, JSON.stringify(asked) + agentOut);
+  const { data: friendMsgs } = await me.from('messages').select('role,text,conversation_id').order('created_at');
+  const friendConv = (await me.from('conversations').select('id').eq('bot_id', friend!.id).single()).data!;
+  assert.ok(friendMsgs!.some((m) => m.conversation_id === friendConv.id && m.role === 'user' && /💬 Asystent:/.test(m.text)));
+
+  // Routines: due ones run on the device and post into the bot's chat; the next run gets scheduled.
+  const { data: routine, error: routineErr } = await me
+    .from('routines')
+    .insert({ bot_id: friend!.id, device_id: device.id, name: 'Poranny raport', prompt: 'Co nowego?', schedule: { kind: 'daily', time: '08:00' }, timezone: 'Europe/Warsaw', next_run_at: new Date(Date.now() - 1000).toISOString() })
+    .select()
+    .single<RoutineRow>();
+  assert.ifError(routineErr);
+  const ran = await waitFor(async () => {
+    const { data } = await me.from('routines').select('*').eq('id', routine!.id).single<RoutineRow>();
+    return data?.last_run_at ? data : undefined;
+  }, 45_000);
+  assert.ok(Date.parse(ran.next_run_at!) > Date.now(), 'next run is in the future');
+  await waitFor(async () => {
+    const { data } = await me.from('messages').select('text').eq('conversation_id', friendConv.id).like('text', '⏰ Poranny raport%');
+    return data?.length ? true : undefined;
+  });
+
   // Another person sees nothing and cannot route messages to this device.
   const stranger = client();
   await signUp(stranger);
@@ -128,4 +176,10 @@ test('pair a device, chat with a bot, cancel, and keep strangers out', { skip: !
   assert.equal(theirBots?.length, 0);
   const { data: devs } = await stranger.from('devices').select('id');
   assert.equal(devs?.length, 0);
+  const { data: theirRoutines } = await stranger.from('routines').select('id');
+  assert.equal(theirRoutines?.length, 0);
+  const { error: sendAs } = await stranger.rpc('bot_send', { p_from: bot.id, p_to: friend!.id, p_text: 'hi' });
+  assert.ok(sendAs, 'only the device can send as its bots');
+  const { error: runAs } = await stranger.rpc('run_routine', { p_routine: routine!.id });
+  assert.ok(runAs, 'only the device runs its routines');
 });
